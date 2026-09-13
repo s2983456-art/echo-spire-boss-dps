@@ -42,7 +42,8 @@
     .steps { display:grid; grid-template-columns:1fr; gap:12px; }
     .steps.one-step { grid-template-columns:1fr; }
     .step { min-height:120px; padding:16px; border:1px solid var(--outline); border-radius:10px; background:var(--surface-low); }
-    .step-number { display:inline-grid; place-items:center; width:23px; height:23px; margin-bottom:9px; border-radius:50%; background:var(--primary-container); color:var(--on-primary-container); font-size:12px; font-weight:700; }
+    .step-heading { display:flex; align-items:center; gap:9px; margin-bottom:9px; }
+    .step-number { display:inline-grid; place-items:center; flex:0 0 23px; width:23px; height:23px; border-radius:50%; background:var(--primary-container); color:var(--on-primary-container); font-size:12px; font-weight:700; }
     .step strong { display:block; font-size:14px; }
     .folder-picked { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; margin-top:9px; color:var(--primary); font-size:11px; }
     .name-row { display:flex; gap:8px; }
@@ -159,8 +160,8 @@
       <div class="page-brand"><img class="page-logo" src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcR0zv-pflE7C-ycPGhVlPjtG75XFML25Sc41Msy2jpvpQ&amp;s=10" alt="Echo Spire"><h1 class="page-title">Echo Spire Boss DPS v1.0.1</h1></div>
       <section class="setup" aria-label="Start analysis">
         <div class="steps one-step" id="steps">
-          <div class="step"><span class="step-number">1</span><strong>Select data &nbsp; Example: …/spirit-vale-overlay-windows-x64-v0.10.8/data</strong><label class="file-button" for="folderInput">Choose folder</label><span class="folder-picked" id="folderName"></span></div>
-          <div class="step" id="characterStep" hidden><span class="step-number">2</span><strong>Select character</strong><div class="name-row"><select id="characterName" disabled aria-label="Select character"><option value="">Select data first</option></select></div></div>
+          <div class="step"><div class="step-heading"><span class="step-number">1</span><strong>Select data &nbsp; Example: …/spirit-vale-overlay-windows-x64-v0.10.8/data</strong></div><label class="file-button" for="folderInput">Choose folder</label><span class="folder-picked" id="folderName"></span></div>
+          <div class="step" id="characterStep" hidden><div class="step-heading"><span class="step-number">2</span><strong>Select character</strong></div><div class="name-row"><select id="characterName" disabled aria-label="Select character"><option value="">Select data first</option></select></div></div>
         </div>
         <button class="button primary start-button" id="analyseButton" disabled hidden>Start analysis</button>
         <input id="folderInput" type="file" webkitdirectory directory multiple>
