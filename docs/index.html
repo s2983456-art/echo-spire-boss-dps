@@ -186,8 +186,9 @@
       [5,'Vorpal Hare',17000000],[10,'Sting',16000000],[15,'Werewolf',27000000],[20,'Cat Bolt',30000000],[25,'Cactus Boss',53000000],[30,'Sunflora Pixie',24000000],[35,'Hermit King',66000000],[35,'Scorpion King',43000000],[40,'Snake Naga',47000000],[40,'Bat Lord',30000000],[45,'Zombie Goblin King',72000000],[45,'Goblin Giant Gold',72000000],[50,'Ice Mage',36000000],[55,'Angel Mage',39000000],[60,'Queen Worm',96000000],[60,'Worm Creep',69000000],[65,'Imp Devil',75000000],[70,'Death Mage',50000000],[75,'Goblin Warchief',89000000],[80,'Mega Ice Golem',150000000],[85,'Turtle King',100000000],[85,'Eyeball Monster',100000000],[90,'Alien Big Blink',110000000],[90,'Wraith',110000000],[95,'Spider Queen Robot',120000000],[95,'Dragon Predator Robot',120000000],[101,'Echo Paladin Master',210000000],[101,'Echo Gunslinger Master',100000000],[101,'Echo Wizard Master',78000000],[101,'Echo Priest Master',78000000],[101,'Echo Shinobi Master',130000000],[101,'Echo Necromancer Master',180000000],[101,'Echo Berserker Master',130000000],[101,'Echo Weaver Master',130000000],
       [15,'Lycanthrope',27000000],[25,'Cactus King',53000000],[40,'Naga',47000000],[45,'Zombie Orc Lord',72000000],[55,'Seraphim Arbiter',39000000],[60,'Devourer',96000000],[70,'Night Baron',50000000],[75,'Orc Warchief',89000000],[80,'Ice Titan',150000000],[85,'Turtle Champion',100000000],[90,'Wraith King',110000000],[101,'NightmarePaladin',210000000],[101,'NightmareGunslinger',100000000],[101,'NightmareWizard',78000000],[101,'NightmarePriest',78000000],[101,'NightmareShinobi',130000000],[101,'NightmareNecromancer',180000000],[101,'NightmareBerserker',130000000],[101,'NightmareWeaver',130000000]
     ].map(([floor, name, hp]) => [`${floor}|${name.trim().toLocaleLowerCase()}`, hp]));
-    const ANALYSIS_CACHE_VERSION = 5;
+    const ANALYSIS_CACHE_VERSION = 6;
     const ANALYSIS_CONFIG = {echoOnly:true, deathRequired:true, minRawHpFraction:.1, dpsBucketSeconds:1, bossGeneration:'monsterIdentity-v1'};
+    const ANALYSIS_WORKER_STALL_MS = 75000;
     const BOSS_IMAGE_BASE = 'https://spiritvalers.com/wiki-data/monster-icons/';
     const CLASS_IMAGE_BASE = 'https://spiritvalers.com/content/game/icons/class-';
     const ECHO_MASTER_CLASSES = {
@@ -206,7 +207,7 @@
       'Echo Berserker Master':'nightmareberserkerboss', 'Echo Gunslinger Master':'nightmaregunslingerboss', 'Echo Necromancer Master':'nightmarenecromancerboss', 'Echo Paladin Master':'nightmarepaladinboss',
       'Echo Priest Master':'nightmarepriestboss', 'Echo Shinobi Master':'nightmareshinobiboss', 'Echo Weaver Master':'nightmareweaverboss', 'Echo Wizard Master':'nightmarewizardboss'
     };
-    const state = { files: [], runs: [], selected: null, selectedRun: null, analysedCharacter: '', characterProfiles: new Map(), bossSearch: '', chartWindow: 1, timelineChart: null, sort: {key: 'best', direction: 'desc'} };
+    const state = { files: [], runs: [], skippedLogs: [], selected: null, selectedRun: null, analysedCharacter: '', characterProfiles: new Map(), bossSearch: '', chartWindow: 1, timelineChart: null, sort: {key: 'best', direction: 'desc'} };
     const $ = id => document.getElementById(id);
     const fmt = value => new Intl.NumberFormat().format(Math.round(value));
     const escape = value => String(value).replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
@@ -215,7 +216,8 @@
     function showWorkspace() { $('workspace').classList.add('visible'); $('workspace').scrollIntoView({behavior:'smooth', block:'start'}); }
     function setStatus(title, status, error = false) { /* Status is intentionally kept out of the minimal start screen. */ }
     function setProgress(message, visible = true) {
-      const match = String(message).match(/(\d+)\s*\/\s*(\d+)/), percent = match ? Math.round(Number(match[1]) / Math.max(1, Number(match[2])) * 100) : null;
+      const match = String(message).match(/(\d+)\s*\/\s*(\d+)/);
+      const percent = match ? (() => { const current = Number(match[1]), total = Math.max(1, Number(match[2])); return current >= total ? 100 : Math.min(99, Math.floor(current / total * 100)); })() : null;
       $('progress').textContent = percent === null ? message : `${message} · ${percent}%`;
       $('progressShell').classList.toggle('show', visible);
       $('progressBar').style.width = percent === null ? '' : `${percent}%`;
@@ -407,16 +409,19 @@
         const echoRawHp = (floor, mobId, name) => ECHO_SPIRE_RAW_HP.get(floor + '|' + normaliseName(mobId)) ?? ECHO_SPIRE_RAW_HP.get(floor + '|' + normaliseName(name));
         async function readLines(file, callback) {
           const reader = file.stream().getReader(), decoder = new TextDecoder();
-          let pending = '';
+          let pending = '', lineCount = 0;
           while (true) {
             const {value, done} = await reader.read();
             if (done) break;
             const lines = (pending + decoder.decode(value, {stream:true})).split(/\r?\n/);
             pending = lines.pop();
-            for (const line of lines) if (line) callback(line);
+            for (const line of lines) if (line) {
+              callback(line);
+              if (++lineCount % 5000 === 0) self.postMessage({type:'progress', lines:lineCount});
+            }
           }
           pending += decoder.decode();
-          if (pending) callback(pending);
+          if (pending) { callback(pending); self.postMessage({type:'progress', lines:lineCount + 1}); }
         }
         function towerAt(towers, at) {
           for (let i = towers.length - 1; i >= 0; i--) if (towers[i].at <= at) return towers[i];
@@ -464,8 +469,8 @@
           });
         }
         self.onmessage = async event => {
-          try { self.postMessage({runs:await parseCombatFile(event.data.file, event.data.character)}); }
-          catch (error) { self.postMessage({error:String(error?.message || error)}); }
+          try { self.postMessage({type:'result', runs:await parseCombatFile(event.data.file, event.data.character)}); }
+          catch (error) { self.postMessage({type:'result', error:String(error?.message || error)}); }
         };
       `;
       const url = URL.createObjectURL(new Blob([source], {type:'text/javascript'}));
@@ -473,37 +478,81 @@
     }
 
     async function analyseWithWorkers(logs, character) {
-      if (!window.Worker || !logs.length) return false;
-      const count = Math.min(6, Math.max(2, navigator.hardwareConcurrency || 4), logs.length);
+      if (!window.Worker || !logs.length) return {used:false, skipped:[]};
+      const count = Math.min(4, Math.max(2, navigator.hardwareConcurrency || 4), logs.length);
       let nextIndex = 0, completed = 0, finished = false;
-      const workers = [];
+      const workers = new Set(), skipped = [];
       return new Promise(resolve => {
-        const finish = success => {
+        const cleanup = workerData => {
+          clearTimeout(workerData.timer);
+          workerData.worker.terminate();
+          URL.revokeObjectURL(workerData.url);
+          workers.delete(workerData);
+        };
+        const finish = used => {
           if (finished) return;
           finished = true;
-          workers.forEach(({worker, url}) => { worker.terminate(); URL.revokeObjectURL(url); });
-          resolve(success);
+          [...workers].forEach(cleanup);
+          resolve({used, skipped});
         };
-        const start = worker => {
-          if (nextIndex >= logs.length) { if (completed === logs.length) finish(true); return; }
-          worker.postMessage({file: logs[nextIndex++], character});
+        const progress = extra => setProgress(`Analysing ${completed} / ${logs.length}…${extra || ''}`);
+        const done = () => completed >= logs.length;
+        const dispatch = workerData => {
+          if (finished || workerData.task) return;
+          if (nextIndex >= logs.length) { if (done()) finish(true); return; }
+          workerData.task = logs[nextIndex++];
+          workerData.worker.postMessage({file: workerData.task, character});
+          arm(workerData);
         };
-        try {
-          for (let index = 0; index < count; index++) {
-            const workerData = createAnalysisWorker(), worker = workerData.worker;
-            workers.push(workerData);
-            worker.onmessage = event => {
-              if (finished) return;
-              if (event.data.error) { state.runs = []; finish(false); return; }
-              state.runs.push(...event.data.runs);
+        const replace = () => {
+          const nextWorker = spawn();
+          if (!nextWorker) { finish(false); return; }
+          dispatch(nextWorker);
+        };
+        const skip = (workerData, reason, replaceWorker = false) => {
+          const file = workerData.task;
+          if (!file || finished) return;
+          workerData.task = null;
+          skipped.push({name:relativePath(file) || file.name, reason});
+          completed++;
+          progress(` · skipped ${skipped.length}`);
+          if (replaceWorker) cleanup(workerData);
+          if (done()) { finish(true); return; }
+          if (replaceWorker) replace(); else dispatch(workerData);
+        };
+        const arm = workerData => {
+          clearTimeout(workerData.timer);
+          workerData.timer = setTimeout(() => skip(workerData, 'timed out', true), ANALYSIS_WORKER_STALL_MS);
+        };
+        const spawn = () => {
+          try {
+            const workerData = {...createAnalysisWorker(), task:null, timer:0};
+            workers.add(workerData);
+            workerData.worker.onmessage = event => {
+              if (finished || !workerData.task) return;
+              if (event.data?.type === 'progress') {
+                arm(workerData);
+                progress(` · current file ${Number(event.data.lines || 0).toLocaleString()} lines`);
+                return;
+              }
+              clearTimeout(workerData.timer);
+              const runs = event.data?.runs;
+              if (event.data?.error || !Array.isArray(runs)) { skip(workerData, event.data?.error || 'invalid result'); return; }
+              workerData.task = null;
+              state.runs.push(...runs);
               completed++;
-              setProgress(`Analysing ${completed} / ${logs.length}…`);
-              start(worker);
+              progress();
+              if (done()) finish(true); else dispatch(workerData);
             };
-            worker.onerror = () => { state.runs = []; finish(false); };
-            start(worker);
-          }
-        } catch (_) { state.runs = []; finish(false); }
+            workerData.worker.onerror = () => skip(workerData, 'worker error', true);
+            return workerData;
+          } catch (_) { return null; }
+        };
+        for (let index = 0; index < count; index++) {
+          const workerData = spawn();
+          if (!workerData) { finish(false); return; }
+          dispatch(workerData);
+        }
       });
     }
 
@@ -512,7 +561,7 @@
       if (!character) { setStatus('Select character', '', true); $('characterName').focus(); return; }
       if (!state.files.length) { setStatus('Select data', '', true); return; }
       showWorkspace();
-      state.runs = []; state.selected = null; state.selectedRun = null;
+      state.runs = []; state.skippedLogs = []; state.selected = null; state.selectedRun = null;
       const key = cacheKey(character);
       setProgress('Loading saved analysis…');
       const cached = await readCache(key);
@@ -521,16 +570,18 @@
       }
       setProgress('Preparing combat logs…');
       const logs = state.files.filter(isCombatLog);
-      const usedWorkers = await analyseWithWorkers(logs, character);
-      if (!usedWorkers) {
+      const workerResult = await analyseWithWorkers(logs, character);
+      state.skippedLogs = workerResult.skipped;
+      if (!workerResult.used) {
+        state.runs = []; state.skippedLogs = [];
         for (let index = 0; index < logs.length; index++) {
           state.runs.push(...await parseCombatFile(logs[index], character));
           setProgress(`Analysing ${index + 1} / ${logs.length}…`);
           await new Promise(resolve => setTimeout(resolve, 0));
         }
       }
-      state.analysedCharacter = character; state.selected = state.runs.length ? summary()[0] : null; state.selectedRun = null; setProgress('', false); $('folderName').textContent = `${character} · ${state.runs.length} valid runs`;
-      if (state.runs.length) await writeCache(key, character, state.runs);
+      state.analysedCharacter = character; state.selected = state.runs.length ? summary()[0] : null; state.selectedRun = null; setProgress('', false); $('folderName').textContent = `${character} · ${state.runs.length} valid runs${state.skippedLogs.length ? ` · ${state.skippedLogs.length} log skipped` : ''}`;
+      if (state.runs.length && !state.skippedLogs.length) await writeCache(key, character, state.runs);
       if (state.runs.length) setStatus('Complete', `${character} · ${state.runs.length} runs`);
       else setStatus('No runs found', character, true);
       render();
