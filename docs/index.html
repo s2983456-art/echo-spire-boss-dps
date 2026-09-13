@@ -56,6 +56,10 @@
     .panel-title { display:flex; align-items:flex-end; justify-content:space-between; gap:12px; margin:0 0 10px; }
     .panel-title h1 { margin:0; font-size:17px; font-weight:600; }
     .panel-title p { margin:0; color:var(--muted); font-size:12px; }
+    #loadedMeta { display:flex; align-items:center; justify-content:flex-end; gap:6px; text-align:right; }
+    .character-avatar { position:relative; display:inline-grid; place-items:center; flex:0 0 auto; width:27px; height:27px; overflow:hidden; border-radius:50%; background:var(--avatar,#3a4b3f); color:#f0f5ed; font-size:9px; font-weight:700; }
+    .character-avatar img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
+    .character-profile { color:var(--primary); font-weight:600; }
     .control-card { display:grid; grid-template-columns:minmax(180px,1fr) minmax(180px,1fr) auto; gap:10px; padding:12px; border:1px solid var(--outline); border-radius:var(--radius); background:var(--surface-low); }
     label { display:grid; gap:5px; color:var(--muted); font-size:11px; font-weight:600; letter-spacing:.02em; }
     input[type=text] { min-width:0; height:34px; padding:6px 9px; border:1px solid var(--outline); border-radius:6px; background:var(--surface); color:var(--text); outline:none; }
@@ -185,6 +189,11 @@
     const ANALYSIS_CACHE_VERSION = 5;
     const ANALYSIS_CONFIG = {echoOnly:true, deathRequired:true, minRawHpFraction:.1, dpsBucketSeconds:1, bossGeneration:'monsterIdentity-v1'};
     const BOSS_IMAGE_BASE = 'https://spiritvalers.com/wiki-data/monster-icons/';
+    const CLASS_IMAGE_BASE = 'https://spiritvalers.com/content/game/icons/class-';
+    const ECHO_MASTER_CLASSES = {
+      'Echo Berserker Master':'Berserker', 'Echo Gunslinger Master':'Gunslinger', 'Echo Necromancer Master':'Necromancer', 'Echo Paladin Master':'Paladin',
+      'Echo Priest Master':'Priest', 'Echo Shinobi Master':'Shinobi', 'Echo Weaver Master':'Weaver', 'Echo Wizard Master':'Wizard'
+    };
     const BOSS_IMAGE_SLUGS = {
       'Vorpal Hare':'hare', 'Sting':'sting', 'Vespa':'sting', 'Werewolf':'werewolf', 'Lycanthrope':'werewolf', 'Cat Bolt':'cat-bolt', 'Raiju':'cat-bolt',
       'Cactus Boss':'cactus-king', 'Cactus King':'cactus-king', 'Sunflora Pixie':'sunflora-pixie', 'Lady Fey':'sunflora-pixie', 'Hermit King':'hermit-king', 'Scorpion King':'scorpion-king',
@@ -197,7 +206,7 @@
       'Echo Berserker Master':'nightmareberserkerboss', 'Echo Gunslinger Master':'nightmaregunslingerboss', 'Echo Necromancer Master':'nightmarenecromancerboss', 'Echo Paladin Master':'nightmarepaladinboss',
       'Echo Priest Master':'nightmarepriestboss', 'Echo Shinobi Master':'nightmareshinobiboss', 'Echo Weaver Master':'nightmareweaverboss', 'Echo Wizard Master':'nightmarewizardboss'
     };
-    const state = { files: [], runs: [], selected: null, selectedRun: null, analysedCharacter: '', bossSearch: '', chartWindow: 1, timelineChart: null, sort: {key: 'best', direction: 'desc'} };
+    const state = { files: [], runs: [], selected: null, selectedRun: null, analysedCharacter: '', characterProfiles: new Map(), bossSearch: '', chartWindow: 1, timelineChart: null, sort: {key: 'best', direction: 'desc'} };
     const $ = id => document.getElementById(id);
     const fmt = value => new Intl.NumberFormat().format(Math.round(value));
     const escape = value => String(value).replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
@@ -213,6 +222,20 @@
       $('progressBar').classList.toggle('indeterminate', visible && percent === null);
     }
     function normaliseName(name) { return name.trim().toLocaleLowerCase(); }
+    function classSlug(name) { return String(name || '').trim().toLocaleLowerCase().replace(/[^a-z0-9]+/g, '-'); }
+    function classImageUrl(name) { const slug = classSlug(name); return slug ? `${CLASS_IMAGE_BASE}${slug}.webp` : ''; }
+    function bossImageUrl(name) {
+      const masterClass = ECHO_MASTER_CLASSES[name];
+      if (masterClass) return classImageUrl(masterClass);
+      const slug = BOSS_IMAGE_SLUGS[name];
+      return slug ? `${BOSS_IMAGE_BASE}${slug}.webp` : '';
+    }
+    function activeProfile() { return state.characterProfiles.get(state.analysedCharacter) || null; }
+    function profileLabel(profile) {
+      if (!profile) return '';
+      const level = Number.isFinite(profile.level) ? `Lv. ${profile.level}` : '';
+      return [profile.className, level].filter(Boolean).join(' · ');
+    }
     function relativePath(file) { return file.webkitRelativePath || file.relativePath || ''; }
     function isCombatLog(file) { return /\.jsonl$/i.test(file.name) && /(^|\/)logs\/combat\//i.test(relativePath(file).replaceAll('\\','/')); }
 
@@ -277,11 +300,19 @@
     }
 
     async function findCharacters() {
+      state.characterProfiles.clear();
       const characterFile = state.files.find(file => file.name.toLowerCase() === 'character.json');
       if (characterFile) {
         try {
           const cache = JSON.parse(await characterFile.text());
-          const names = Array.isArray(cache.characters) ? cache.characters.map(character => character?.name) : [];
+          const characters = Array.isArray(cache.characters) ? cache.characters : [];
+          const names = characters.map(character => character?.name);
+          characters.forEach(character => {
+            const name = String(character?.name || '').trim();
+            if (!name) return;
+            const archetypes = Array.isArray(character.archetypes) ? character.archetypes.filter(Boolean) : [];
+            state.characterProfiles.set(name, {className: String(archetypes.at(-1) || archetypes[0] || ''), level: Number(character.level)});
+          });
           if (names.filter(Boolean).length) return {names, activeName: cache.activeName || ''};
         } catch (_) { /* Fall back to names found in combat logs. */ }
       }
@@ -528,7 +559,8 @@
 
     function render() {
       const allRows = summary(), query = state.bossSearch.trim().toLocaleLowerCase(), rows = query ? allRows.filter(row => `${row.boss} ${row.location}`.toLocaleLowerCase().includes(query)) : allRows, max = Math.max(1, ...allRows.map(row => row.best.dps));
-      $('loadedMeta').textContent = state.runs.length ? `${state.analysedCharacter} · ${state.runs.length} runs` : '';
+      const profile = activeProfile(), profileText = profileLabel(profile);
+      $('loadedMeta').innerHTML = state.runs.length ? `<span>${escape(state.analysedCharacter)}</span>${profileText ? `${classAvatarMarkup(profile.className)}<span class="character-profile">${escape(profileText)}</span>` : ''}<span>· ${state.runs.length} runs</span>` : '';
       $('metrics').innerHTML = state.runs.length ? [
         ['ACTIVE CHARACTER', escape(state.analysedCharacter), ''], ['BOSSES RECORDED', allRows.length, ''], ['BEST TARGET DPS', `${fmt(max)} DPS`, 'value'], ['TOTAL BOSS RUNS', state.runs.length, '']
       ].map(([label,value,kind]) => `<div class="metric ${kind}"><small>${label}</small><b>${value}</b></div>`).join('') : '';
@@ -651,17 +683,25 @@
       return `hsl(${value % 360} 42% 35%)`;
     }
     function reportInitials(name) { return name.split(/\s+/).map(word => word[0]).join('').slice(0, 3).toUpperCase(); }
+    function classAvatarMarkup(name) {
+      const imageUrl = classImageUrl(name), image = imageUrl ? `<img src="${imageUrl}" alt="" loading="lazy" onerror="this.remove()">` : '';
+      return `<span class="character-avatar" style="--avatar:${reportColor(name)}"><span>${escape(reportInitials(name))}</span>${image}</span>`;
+    }
     function bossAvatarMarkup(name, className = 'boss-avatar') {
-      const slug = BOSS_IMAGE_SLUGS[name], image = slug ? `<img src="${BOSS_IMAGE_BASE}${slug}.webp" alt="" loading="lazy" onerror="this.remove()">` : '';
+      const imageUrl = bossImageUrl(name), image = imageUrl ? `<img src="${imageUrl}" alt="" loading="lazy" onerror="this.remove()">` : '';
       return `<span class="${className}" style="--avatar:${reportColor(name)}"><span>${escape(reportInitials(name))}</span>${image}</span>`;
     }
     function updateHistoryAvatar(name = '') {
-      const avatar = $('historyAvatar'), text = $('historyAvatarText'), image = $('historyAvatarImage'), slug = BOSS_IMAGE_SLUGS[name];
+      const avatar = $('historyAvatar'), text = $('historyAvatarText'), image = $('historyAvatarImage'), imageUrl = bossImageUrl(name);
       text.textContent = name ? reportInitials(name) : '?';
       avatar.style.setProperty('--avatar', name ? reportColor(name) : '#3a4b3f');
-      image.hidden = !slug;
-      if (slug) image.src = `${BOSS_IMAGE_BASE}${slug}.webp`;
-      image.onerror = () => { image.hidden = true; };
+      image.hidden = true;
+      image.removeAttribute('src');
+      if (imageUrl) {
+        image.onload = () => { image.hidden = false; };
+        image.onerror = () => { image.hidden = true; };
+        image.src = imageUrl;
+      }
     }
     function reportText(context, value, maxWidth) {
       let text = value;
@@ -683,20 +723,28 @@
     async function loadReportPortraits(rows) {
       const portraits = new Map();
       await Promise.all([...new Set(rows.map(row => row.boss))].map(name => new Promise(resolve => {
-        const slug = BOSS_IMAGE_SLUGS[name];
-        if (!slug) { resolve(); return; }
+        const imageUrl = bossImageUrl(name);
+        if (!imageUrl) { resolve(); return; }
         const image = new Image(); image.crossOrigin = 'anonymous'; image.decoding = 'async';
         image.onload = () => { portraits.set(name, image); resolve(); };
         image.onerror = resolve;
-        image.src = `${BOSS_IMAGE_BASE}${slug}.webp`;
+        image.src = imageUrl;
       })));
       return portraits;
+    }
+    function loadImage(imageUrl) {
+      if (!imageUrl) return Promise.resolve(null);
+      return new Promise(resolve => {
+        const image = new Image(); image.crossOrigin = 'anonymous'; image.decoding = 'async';
+        image.onload = () => resolve(image); image.onerror = () => resolve(null); image.src = imageUrl;
+      });
     }
     async function downloadImageReport() {
       if (!state.runs.length) return;
       setProgress('Generating image report…');
       const rows = summary().sort((left, right) => Number(left.location.match(/(\d+)F$/)?.[1]) - Number(right.location.match(/(\d+)F$/)?.[1]) || left.boss.localeCompare(right.boss));
-      const portraits = await loadReportPortraits(rows);
+      const profile = activeProfile();
+      const [portraits, classPortrait] = await Promise.all([loadReportPortraits(rows), loadImage(classImageUrl(profile?.className))]);
       const perColumn = 9, firstColumnBosses = 7, columns = Math.max(1, 1 + Math.ceil(Math.max(0, rows.length - firstColumnBosses) / perColumn)), width = Math.max(640, columns * 310 + 40), top = 10, rowHeight = 92, height = top + perColumn * rowHeight + 10;
       const columnWidth = (width - 40 - 12) / columns;
       const canvas = document.createElement('canvas'); canvas.width = width; canvas.height = height;
@@ -704,7 +752,9 @@
       context.fillStyle = '#101410'; context.fillRect(0, 0, width, height);
       const title = 'Echo Spire Boss DPS';
       context.fillStyle = '#e0e4db'; context.font = '700 28px Segoe UI'; context.fillText(title, 30, top + 36);
-      context.fillStyle = '#8fd6a2'; context.font = '700 24px Segoe UI'; context.fillText(state.analysedCharacter, 30, top + 73);
+      const characterText = profileLabel(profile) ? `${state.analysedCharacter} · ${profileLabel(profile)}` : state.analysedCharacter;
+      drawReportAvatar(context, profile?.className || state.analysedCharacter, 30, top + 47, 28, classPortrait);
+      context.fillStyle = '#8fd6a2'; context.font = '700 18px Segoe UI'; context.fillText(reportText(context, characterText, 238), 66, top + 69);
       const bestRuns = rows.map(row => row.best);
       const totalDamage = bestRuns.reduce((total, run) => total + run.damage, 0);
       const totalDuration = bestRuns.reduce((total, run) => total + run.duration, 0);
