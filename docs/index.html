@@ -1,0 +1,702 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Echo Spire Boss DPS</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --surface:#101410; --surface-low:#181d17; --container:#1c211b;
+      --container-high:#262b24; --highest:#31362f; --text:#e0e4db;
+      --muted:#c1c9bd; --outline:#414941; --primary:#8fd6a2;
+      --primary-container:#1d5233; --on-primary-container:#aaf2bc;
+      --secondary:#3a4b3f; --value:#dbc66e; --error:#ffb4ab;
+      --radius:12px; font-family:Roboto,"Segoe UI",system-ui,sans-serif;
+    }
+    * { box-sizing:border-box; }
+    body { margin:0; min-width:320px; min-height:100vh; background:#070a07; color:var(--text); }
+    button,input { font:inherit; }
+    button { cursor:pointer; }
+    .app { min-height:100vh; border:1px solid var(--outline); background:var(--surface); }
+    .titlebar { height:48px; display:flex; align-items:center; gap:9px; padding:0 16px; background:var(--surface-low); border-bottom:1px solid #151915; }
+    .spirit { position:relative; width:18px; height:18px; flex:0 0 18px; }
+    .spirit::before,.spirit::after { content:""; position:absolute; border-radius:60% 60% 65% 35%; }
+    .spirit::before { width:15px; height:17px; left:0; top:1px; background:linear-gradient(135deg,#bd76f8,#6130a1); transform:rotate(-23deg); }
+    .spirit::after { width:5px; height:5px; right:0; top:0; background:var(--primary); }
+    .brand { font-size:13px; font-weight:600; }
+    .version,.tag { color:var(--primary); font-size:13px; font-weight:500; }
+    .window-actions { margin-left:auto; display:flex; gap:16px; color:var(--muted); font-size:15px; }
+    .main { padding:18px 20px 28px; max-width:1120px; margin:auto; }
+    .page-title { margin:0 0 12px; font-size:20px; }
+    .capture { display:flex; gap:12px; align-items:center; min-height:62px; padding:12px 14px; border:1px solid var(--outline); border-radius:13px; background:#151a15; }
+    .dot { width:8px; height:8px; border-radius:50%; background:var(--primary); flex:none; }
+    .capture strong { display:block; font-size:13px; }
+    .capture span { display:block; margin-top:3px; color:var(--value); font-size:12px; }
+    .setup { margin-top:16px; padding:22px; border:1px solid var(--outline); border-radius:13px; background:var(--container); }
+    .setup h1 { margin:0 0 16px; font-size:20px; }
+    .steps { display:grid; grid-template-columns:1fr; gap:12px; }
+    .steps.one-step { grid-template-columns:1fr; }
+    .step { min-height:120px; padding:16px; border:1px solid var(--outline); border-radius:10px; background:var(--surface-low); }
+    .step-number { display:inline-grid; place-items:center; width:23px; height:23px; margin-bottom:9px; border-radius:50%; background:var(--primary-container); color:var(--on-primary-container); font-size:12px; font-weight:700; }
+    .step strong { display:block; font-size:14px; }
+    .folder-picked { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; margin-top:9px; color:var(--primary); font-size:11px; }
+    .name-row { display:flex; gap:8px; }
+    .name-row select { flex:1; min-width:0; height:34px; padding:6px 9px; border:1px solid var(--outline); border-radius:6px; background:var(--surface); color:var(--text); outline:none; }
+    .name-row select:focus { border-color:var(--primary); box-shadow:inset 0 0 0 1px var(--primary); }
+    .name-row select:disabled { color:var(--muted); }
+    .start-button { display:block; width:100%; margin-top:12px; border-radius:8px; }
+    .start-button:disabled { cursor:not-allowed; opacity:.45; }
+    .workspace { display:none; margin-top:20px; }
+    .workspace.visible { display:block; }
+    .panel-title { display:flex; align-items:flex-end; justify-content:space-between; gap:12px; margin:0 0 10px; }
+    .panel-title h1 { margin:0; font-size:17px; font-weight:600; }
+    .panel-title p { margin:0; color:var(--muted); font-size:12px; }
+    .control-card { display:grid; grid-template-columns:minmax(180px,1fr) minmax(180px,1fr) auto; gap:10px; padding:12px; border:1px solid var(--outline); border-radius:var(--radius); background:var(--surface-low); }
+    label { display:grid; gap:5px; color:var(--muted); font-size:11px; font-weight:600; letter-spacing:.02em; }
+    input[type=text] { min-width:0; height:34px; padding:6px 9px; border:1px solid var(--outline); border-radius:6px; background:var(--surface); color:var(--text); outline:none; }
+    input[type=text]:focus { border-color:var(--primary); box-shadow:inset 0 0 0 1px var(--primary); }
+    .file-button,.button { display:inline-flex; align-items:center; justify-content:center; align-self:end; height:34px; padding:0 13px; border:1px solid var(--outline); border-radius:18px; background:transparent; color:var(--primary); font-size:12px; font-weight:600; white-space:nowrap; }
+    .file-button:hover,.button:hover { background:rgba(143,214,162,.08); }
+    .primary { border-color:transparent; background:var(--primary); color:#0b3820; }
+    .primary:hover { background:#a5e3b4; }
+    #folderInput { display:none; }
+    .progress { display:none; margin:11px 1px 0; color:var(--value); font-size:12px; }
+    .progress.show { display:block; }
+    .metrics { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin:12px 0; }
+    .metric { padding:12px 14px; border-radius:var(--radius); background:var(--container); }
+    .metric small { display:block; color:var(--muted); font-size:10px; font-weight:600; }
+    .metric b { display:block; margin-top:4px; font-size:21px; font-variant-numeric:tabular-nums; }
+    .metric.value b { color:var(--value); }
+    .data-layout { display:grid; grid-template-columns:minmax(0,1.5fr) minmax(280px,.9fr); gap:12px; }
+    .data-card { min-width:0; overflow:hidden; border:1px solid var(--outline); border-radius:var(--radius); background:var(--surface-low); }
+    .run-detail-card { margin-top:12px; }
+    .run-detail-content { padding:14px; }
+    .card-head { display:flex; align-items:center; justify-content:space-between; padding:12px 14px; border-bottom:1px solid var(--outline); }
+    .card-head h2 { margin:0; font-size:14px; font-weight:600; }
+    .card-head span { color:var(--muted); font-size:11px; }
+    .card-actions { display:flex; align-items:center; gap:10px; }
+    .boss-list { max-height:430px; overflow:auto; }
+    .boss-row { display:grid; width:100%; grid-template-columns:minmax(105px,1fr) 90px 80px 80px 88px 64px 52px; align-items:center; gap:8px; min-height:42px; padding:0 14px; border:0; border-bottom:1px solid var(--outline); border-radius:0; color:var(--text); text-align:left; font-size:12px; font-variant-numeric:tabular-nums; }
+    .boss-row:last-child { border-bottom:0; }
+    .boss-row:not(.head) { cursor:pointer; background:linear-gradient(90deg,var(--primary-container) 0 var(--fill),transparent var(--fill)); }
+    .boss-row:not(.head):hover,.boss-row.selected { background-color:var(--secondary); }
+    .boss-row.head { min-height:31px; color:var(--muted); background:var(--container); font-size:10px; font-weight:600; }
+    .sort-button { width:100%; padding:0; border:0; background:transparent; color:inherit; text-align:left; font:inherit; font-weight:inherit; white-space:nowrap; }
+    .sort-button.num { text-align:right; }
+    .sort-arrow { margin-left:2px; color:var(--primary); }
+    .map { color:var(--primary); font-size:10px; }
+    .num { text-align:right; }
+    .gold { color:var(--value); }
+    .detail { padding:14px; }
+    .detail.empty { color:var(--muted); font-size:12px; padding-top:42px; text-align:center; }
+    .detail h3 { margin:0; font-size:17px; }
+    .detail .sub { margin:5px 0 13px; color:var(--muted); font-size:12px; }
+    .detail-metrics { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+    .detail-metric { padding:10px; border-radius:9px; background:var(--container); }
+    .detail-metric small { display:block; color:var(--muted); font-size:9px; font-weight:600; }
+    .detail-metric b { display:block; margin-top:4px; font-size:15px; font-variant-numeric:tabular-nums; }
+    .history-title { margin:17px 0 7px; color:var(--muted); font-size:10px; font-weight:600; }
+    .run { display:flex; width:100%; justify-content:space-between; gap:8px; padding:9px 8px; border:0; border-top:1px solid var(--outline); background:transparent; color:var(--text); text-align:left; font-size:11px; font-variant-numeric:tabular-nums; }
+    button.run { cursor:pointer; }
+    button.run:hover,button.run.selected { background:rgba(143,214,162,.10); }
+    .run time { color:var(--muted); }
+    .run b { color:var(--primary); }
+    .chart { margin-top:14px; padding:10px; border:1px solid var(--outline); border-radius:9px; background:var(--container); }
+    .chart-head { display:flex; justify-content:space-between; gap:8px; color:var(--muted); font-size:9px; font-weight:600; }
+    .chart svg { display:block; width:100%; height:auto; margin-top:8px; overflow:visible; }
+    .chart-grid { stroke:var(--outline); stroke-width:1; }
+    .chart-line { fill:none; stroke:var(--primary); stroke-width:2.5; stroke-linejoin:round; stroke-linecap:round; }
+    .chart-label { fill:var(--muted); font-size:9px; }
+    .chart-hover-line { stroke:var(--value); stroke-width:1; stroke-dasharray:3 3; }
+    .chart-hover-point { fill:var(--value); stroke:var(--surface); stroke-width:2; }
+    .chart-hover-label { fill:var(--value); font-size:10px; font-weight:700; paint-order:stroke; stroke:var(--container); stroke-width:3px; stroke-linejoin:round; }
+    .chart-empty { color:var(--muted); font-size:11px; text-align:center; }
+    .chart-select { height:24px; border:1px solid var(--outline); border-radius:5px; background:var(--surface); color:var(--text); font-size:10px; }
+    .validation { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:5px 10px; margin-top:12px; padding:9px; border:1px solid var(--outline); border-radius:8px; background:var(--container); color:var(--muted); font-size:10px; }
+    .validation b { color:var(--text); font-weight:600; }
+    .flag { margin-left:4px; color:var(--value); font-size:10px; }
+    .error { color:var(--error); }
+    @media (max-width:800px) { .steps,.data-layout { grid-template-columns:1fr; } .control-card { grid-template-columns:1fr; } .metrics { grid-template-columns:repeat(2,1fr); } }
+    @media (max-width:500px) { .main { padding:12px; } .setup { padding:16px; } .titlebar { padding:0 12px; } .version { display:none; } .boss-row { grid-template-columns:minmax(90px,1fr) 86px 76px; } .boss-row .avg,.boss-row .damage,.boss-row .time,.boss-row .runs { display:none; } }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <main class="main">
+      <h1 class="page-title">Echo Spire Boss DPS</h1>
+      <section class="setup" aria-label="Start analysis">
+        <div class="steps one-step" id="steps">
+          <div class="step"><span class="step-number">1</span><strong>Select data &nbsp; Example: …/spirit-vale-overlay-windows-x64-v0.10.8/data</strong><label class="file-button" for="folderInput">Choose folder</label><span class="folder-picked" id="folderName"></span></div>
+          <div class="step" id="characterStep" hidden><span class="step-number">2</span><strong>Select character</strong><div class="name-row"><select id="characterName" disabled aria-label="Select character"><option value="">Select data first</option></select></div></div>
+        </div>
+        <button class="button primary start-button" id="analyseButton" disabled hidden>Start analysis</button>
+        <input id="folderInput" type="file" webkitdirectory directory multiple>
+      </section>
+
+      <section class="workspace" id="workspace">
+        <div class="panel-title"><div><h1>Echo Spire Boss DPS</h1><p>Select a boss to view its runs</p></div><p id="loadedMeta"></p></div>
+        <p class="progress" id="progress"></p>
+        <div class="metrics" id="metrics"></div>
+        <div class="data-layout">
+          <article class="data-card"><div class="card-head"><h2>BOSS performance</h2><div class="card-actions"><span>Click a BOSS for its history</span><button class="button" id="imageReportButton">Image report</button></div></div><div class="boss-list" id="bossList"></div></article>
+          <article class="data-card"><div class="card-head"><h2>Run history</h2></div><div class="detail empty" id="detail">Select a BOSS to show its historical runs.</div></article>
+        </div>
+        <article class="data-card run-detail-card" id="runDetailCard" hidden><div class="card-head"><h2>Run details</h2></div><div class="run-detail-content" id="runDetail"></div></article>
+      </section>
+    </main>
+  </div>
+  <script>
+    const BOSS_NAMES = new Set([
+      'Abyss Archon','Broodmother','Cactus King','Cosmic Entity','Demon Lord','Devourer','Hermit King','Ice Mage','Ice Titan','Kraken','Lady Fey','Lycanthrope','Naga','Night Baron','Orc King','Orc Warchief','Raiju','Robot Dragon','Scorpion King','Seraphim Arbiter','Suphara','Turtle Champion','Vespa','Vorpal Hare','Wraith King','Zombie Orc Lord'
+    ]);
+    const ECHO_SPIRE_RAW_HP = new Map([
+      [5,'Vorpal Hare',17000000],[10,'Sting',16000000],[15,'Werewolf',27000000],[20,'Cat Bolt',30000000],[25,'Cactus Boss',53000000],[30,'Sunflora Pixie',24000000],[35,'Hermit King',66000000],[35,'Scorpion King',43000000],[40,'Snake Naga',47000000],[40,'Bat Lord',30000000],[45,'Zombie Goblin King',72000000],[45,'Goblin Giant Gold',72000000],[50,'Ice Mage',36000000],[55,'Angel Mage',39000000],[60,'Queen Worm',96000000],[60,'Worm Creep',69000000],[65,'Imp Devil',75000000],[70,'Death Mage',50000000],[75,'Goblin Warchief',89000000],[80,'Mega Ice Golem',150000000],[85,'Turtle King',100000000],[85,'Eyeball Monster',100000000],[90,'Alien Big Blink',110000000],[90,'Wraith',110000000],[95,'Spider Queen Robot',120000000],[95,'Dragon Predator Robot',120000000],[101,'Echo Paladin Master',210000000],[101,'Echo Gunslinger Master',100000000],[101,'Echo Wizard Master',78000000],[101,'Echo Priest Master',78000000],[101,'Echo Shinobi Master',130000000],[101,'Echo Necromancer Master',180000000],[101,'Echo Berserker Master',130000000],[101,'Echo Weaver Master',130000000],
+      [15,'Lycanthrope',27000000],[25,'Cactus King',53000000],[40,'Naga',47000000],[45,'Zombie Orc Lord',72000000],[55,'Seraphim Arbiter',39000000],[60,'Devourer',96000000],[70,'Night Baron',50000000],[75,'Orc Warchief',89000000],[80,'Ice Titan',150000000],[85,'Turtle Champion',100000000],[90,'Wraith King',110000000],[101,'NightmarePaladin',210000000],[101,'NightmareGunslinger',100000000],[101,'NightmareWizard',78000000],[101,'NightmarePriest',78000000],[101,'NightmareShinobi',130000000],[101,'NightmareNecromancer',180000000],[101,'NightmareBerserker',130000000],[101,'NightmareWeaver',130000000]
+    ].map(([floor, name, hp]) => [`${floor}|${name.trim().toLocaleLowerCase()}`, hp]));
+    const ANALYSIS_CACHE_VERSION = 5;
+    const ANALYSIS_CONFIG = {echoOnly:true, deathRequired:true, minRawHpFraction:.1, dpsBucketSeconds:1, bossGeneration:'monsterIdentity-v1'};
+    const BOSS_IMAGE_BASE = 'https://spiritvalers.com/wiki-data/monster-icons/';
+    const BOSS_IMAGE_SLUGS = {
+      'Vorpal Hare':'hare', 'Sting':'sting', 'Vespa':'sting', 'Werewolf':'werewolf', 'Lycanthrope':'werewolf', 'Cat Bolt':'cat-bolt', 'Raiju':'cat-bolt',
+      'Cactus Boss':'cactus-king', 'Cactus King':'cactus-king', 'Sunflora Pixie':'sunflora-pixie', 'Lady Fey':'sunflora-pixie', 'Hermit King':'hermit-king', 'Scorpion King':'scorpion-king',
+      'Snake Naga':'snake-naga', 'Naga':'snake-naga', 'Bat Lord':'bat-lord', 'Night Baron':'bat-lord', 'Zombie Goblin King':'zombie-goblin-lord', 'Zombie Orc Lord':'zombie-goblin-lord',
+      'Goblin Giant Gold':'goblin-king', 'Orc King':'goblin-king', 'Ice Mage':'ice-mage', 'Angel Mage':'angel-mage', 'Seraphim Arbiter':'angel-mage', 'Queen Worm':'queen-worm',
+      'Broodmother':'queen-worm', 'Worm Creep':'worm-creep', 'Devourer':'worm-creep', 'Imp Devil':'imp-devil', 'Demon Lord':'imp-devil', 'Death Mage':'death-mage', 'Abyss Archon':'death-mage',
+      'Goblin Warchief':'goblin-warchief', 'Orc Warchief':'goblin-warchief', 'Mega Ice Golem':'mega-ice-golem', 'Ice Titan':'mega-ice-golem', 'Turtle King':'turtle-champion',
+      'Turtle Champion':'turtle-champion', 'Eyeball Monster':'kraken', 'Kraken':'kraken', 'Alien Big Blink':'cosmic-entity', 'Cosmic Entity':'cosmic-entity', 'Wraith':'wraith',
+      'Wraith King':'wraith', 'Spider Queen Robot':'spider-queen', 'Suphara':'spider-queen', 'Dragon Predator Robot':'robot-dragon', 'Robot Dragon':'robot-dragon',
+      'Echo Berserker Master':'nightmareberserkerboss', 'Echo Gunslinger Master':'nightmaregunslingerboss', 'Echo Necromancer Master':'nightmarenecromancerboss', 'Echo Paladin Master':'nightmarepaladinboss',
+      'Echo Priest Master':'nightmarepriestboss', 'Echo Shinobi Master':'nightmareshinobiboss', 'Echo Weaver Master':'nightmareweaverboss', 'Echo Wizard Master':'nightmarewizardboss'
+    };
+    const state = { files: [], runs: [], selected: null, selectedRun: null, analysedCharacter: '', chartWindow: 1, timelineChart: null, sort: {key: 'best', direction: 'desc'} };
+    const $ = id => document.getElementById(id);
+    const fmt = value => new Intl.NumberFormat().format(Math.round(value));
+    const escape = value => String(value).replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
+    const echoRawHp = (floor, mobId, name) => ECHO_SPIRE_RAW_HP.get(`${floor}|${normaliseName(mobId || '')}`) ?? ECHO_SPIRE_RAW_HP.get(`${floor}|${normaliseName(name)}`);
+
+    function showWorkspace() { $('workspace').classList.add('visible'); $('workspace').scrollIntoView({behavior:'smooth', block:'start'}); }
+    function setStatus(title, status, error = false) { /* Status is intentionally kept out of the minimal start screen. */ }
+    function setProgress(message, visible = true) { $('progress').textContent = message; $('progress').classList.toggle('show', visible); }
+    function normaliseName(name) { return name.trim().toLocaleLowerCase(); }
+    function relativePath(file) { return file.webkitRelativePath || file.relativePath || ''; }
+    function isCombatLog(file) { return /\.jsonl$/i.test(file.name) && /(^|\/)logs\/combat\//i.test(relativePath(file).replaceAll('\\','/')); }
+
+    function hashText(text) {
+      let hash = 2166136261;
+      for (let index = 0; index < text.length; index++) { hash ^= text.charCodeAt(index); hash = Math.imul(hash, 16777619); }
+      return (hash >>> 0).toString(36);
+    }
+    function cacheKey(character) {
+      const files = state.files.filter(isCombatLog).map(file => [relativePath(file), file.size || 0, file.lastModified || 0]).sort((a,b) => a[0].localeCompare(b[0]));
+      return `v${ANALYSIS_CACHE_VERSION}-${hashText(JSON.stringify({character:normaliseName(character), config:ANALYSIS_CONFIG, files}))}`;
+    }
+    function openCache() {
+      return new Promise((resolve, reject) => {
+        if (!globalThis.indexedDB) { reject(new Error('IndexedDB unavailable')); return; }
+        const request = indexedDB.open('echo-spire-boss-dps', 1);
+        request.onupgradeneeded = () => request.result.createObjectStore('analysis', {keyPath:'key'});
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+    }
+    async function readCache(key) {
+      try {
+        const db = await openCache();
+        const result = await new Promise((resolve, reject) => {
+          const request = db.transaction('analysis', 'readonly').objectStore('analysis').get(key);
+          request.onsuccess = () => resolve(request.result);
+          request.onerror = () => reject(request.error);
+        });
+        db.close();
+        return result?.version === ANALYSIS_CACHE_VERSION && Array.isArray(result.runs) && result.runs.every(run => Number.isFinite(run.damage) && Number.isFinite(run.duration) && Number.isFinite(run.dps) && Number.isFinite(run.rawHp) && run.rawHpFraction > .1 && run.deathAt) ? result : null;
+      } catch (_) { return null; }
+    }
+    async function writeCache(key, character, runs) {
+      try {
+        const db = await openCache();
+        await new Promise((resolve, reject) => {
+          const request = db.transaction('analysis', 'readwrite').objectStore('analysis').put({key, version:ANALYSIS_CACHE_VERSION, createdAt:Date.now(), analysedCharacter:character, runs});
+          request.onsuccess = resolve; request.onerror = () => reject(request.error);
+        });
+        const records = await new Promise((resolve, reject) => {
+          const request = db.transaction('analysis', 'readonly').objectStore('analysis').getAll();
+          request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.error);
+        });
+        const stale = records.sort((a,b) => b.createdAt - a.createdAt).slice(5);
+        if (stale.length) await new Promise((resolve, reject) => {
+          const store = db.transaction('analysis', 'readwrite').objectStore('analysis');
+          stale.forEach(record => store.delete(record.key));
+          store.transaction.oncomplete = resolve; store.transaction.onerror = () => reject(store.transaction.error);
+        });
+        db.close();
+      } catch (_) { /* Cached analysis is optional. */ }
+    }
+
+    function showCharacterOptions(names, activeName = '') {
+      const select = $('characterName');
+      const unique = [...new Set(names.filter(Boolean))].sort((a, b) => a.localeCompare(b, undefined, {sensitivity:'accent'}));
+      select.innerHTML = unique.length ? `<option value="">Select a character</option>${unique.map(name => `<option value="${escape(name)}">${escape(name)}</option>`).join('')}` : '<option value="">No character data found</option>';
+      select.disabled = !unique.length;
+      if (unique.includes(activeName)) select.value = activeName;
+      $('analyseButton').disabled = !select.value;
+    }
+
+    async function findCharacters() {
+      const characterFile = state.files.find(file => file.name.toLowerCase() === 'character.json');
+      if (characterFile) {
+        try {
+          const cache = JSON.parse(await characterFile.text());
+          const names = Array.isArray(cache.characters) ? cache.characters.map(character => character?.name) : [];
+          if (names.filter(Boolean).length) return {names, activeName: cache.activeName || ''};
+        } catch (_) { /* Fall back to names found in combat logs. */ }
+      }
+      const names = new Set(), logs = state.files.filter(isCombatLog);
+      for (let index = 0; index < logs.length; index++) {
+        setProgress(`Reading character list ${index + 1} / ${logs.length}…`);
+        await readLines(logs[index], line => {
+          try {
+            const record = JSON.parse(line), data = record.data || {};
+            if (record.type === 'combat.actorIdentity' && typeof data.displayName === 'string' && data.displayName.trim()) names.add(data.displayName.trim());
+          } catch (_) { /* Ignore malformed log lines. */ }
+        });
+        await new Promise(resolve => setTimeout(resolve, 0));
+      }
+      return {names: [...names], activeName: ''};
+    }
+
+    async function readLines(file, callback) {
+      const reader = file.stream().pipeThrough(new TextDecoderStream()).getReader();
+      let pending = '';
+      while (true) {
+        const {value, done} = await reader.read();
+        if (done) break;
+        const lines = (pending + value).split(/\r?\n/);
+        pending = lines.pop();
+        for (const line of lines) if (line) callback(line);
+      }
+      if (pending) callback(pending);
+    }
+
+    function makeTimeline(hits, first, deathAt) {
+      const duration = Math.max(1, deathAt - first), bucketSize = 1000;
+      const buckets = new Map();
+      for (const hit of hits) {
+        const bucket = Math.floor((hit.at - first) / bucketSize);
+        buckets.set(bucket, (buckets.get(bucket) || 0) + hit.value);
+      }
+      const timeline = [];
+      for (let bucket = 0; bucket <= Math.floor((duration - 1) / bucketSize); bucket++) {
+        const bucketEnd = Math.min(duration, (bucket + 1) * bucketSize), seconds = (bucketEnd - bucket * bucketSize) / 1000;
+        timeline.push({time:bucketEnd / 1000, dps:(buckets.get(bucket) || 0) / seconds});
+      }
+      return timeline;
+    }
+
+    async function parseCombatFile(file, character) {
+      const actorIds = new Set(), bosses = new Map(), deaths = new Map(), towerFloors = [], zones = [];
+      const fights = new Map();
+      let sessionId = file.name.replace(/\.jsonl$/i, ''), bossInstance = 0;
+      const wantedName = normaliseName(character);
+      await readLines(file, line => {
+        try {
+          const record = JSON.parse(line), data = record.data || {};
+          if (record.sessionId) sessionId = record.sessionId;
+          if (record.type === 'combat.actorIdentity' && normaliseName(data.displayName || '') === wantedName && Number.isInteger(data.actorId)) actorIds.add(data.actorId);
+          const currentTower = [...towerFloors].reverse().find(entry => entry.at <= record.at);
+          const isEchoBoss = currentTower && echoRawHp(currentTower.floor, data.mobId, data.displayName);
+          if (record.type === 'combat.event' && data.kind === 'monsterIdentity' && data.operation === 'remove' && Number.isInteger(data.actorId)) bosses.delete(data.actorId);
+          if (record.type === 'combat.event' && data.kind === 'monsterIdentity' && data.operation === 'upsert' && (BOSS_NAMES.has(data.displayName) || isEchoBoss) && Number.isInteger(data.actorId)) bosses.set(data.actorId, {name: data.displayName, mobId: data.mobId || data.displayName, instance: ++bossInstance});
+          const floor = typeof data.sourceId === 'string' ? data.sourceId.match(/^__spiritvaleTowerFloor:(\d+)$/) : null;
+          if (record.type === 'combat.event' && data.kind === 'activation' && floor && Number.isFinite(record.at)) towerFloors.push({at: record.at, floor: Number(floor[1])});
+          const zone = typeof data.sourceId === 'string' ? data.sourceId.match(/^__spiritvaleZone:(\d+)$/) : null;
+          if (record.type === 'combat.event' && data.kind === 'activation' && zone && Number.isFinite(record.at)) zones.push({at: record.at, zone: Number(zone[1])});
+          if (record.type !== 'combat.event' || !Number.isFinite(record.at)) return;
+          const targetBoss = bosses.get(data.targetId);
+          if (data.kind === 'death' && targetBoss) { deaths.set(`${data.targetId}:${targetBoss.instance}`, record.at); return; }
+          if (data.kind !== 'damage' || data.team !== 0 || !actorIds.has(data.actorId) || !bosses.has(data.targetId) || !(data.value > 0)) return;
+          const boss = bosses.get(data.targetId), deathKey = `${data.targetId}:${boss.instance}`, key = `${sessionId}:${data.actorId}:${deathKey}`;
+          const entry = fights.get(key) || {boss: boss.name, mobId: boss.mobId, generation: boss.instance, sessionId, targetId: data.targetId, deathKey, damage: 0, first: record.at, last: record.at, hits: []};
+          entry.damage += data.value; entry.hits.push({at:record.at, value:data.value}); entry.first = Math.min(entry.first, record.at); entry.last = Math.max(entry.last, record.at); fights.set(key, entry);
+        } catch (_) { /* Ignore malformed log lines. */ }
+      });
+      return [...fights.values()].flatMap(run => {
+        const deathAt = deaths.get(run.deathKey);
+        if (!Number.isFinite(deathAt) || deathAt <= run.first) return [];
+        const duration = (deathAt - run.first) / 1000;
+        const tower = [...towerFloors].reverse().find(entry => entry.at <= deathAt);
+        const rawHp = tower ? echoRawHp(tower.floor, run.mobId, run.boss) : undefined;
+        if (!rawHp || run.damage <= rawHp * .1) return [];
+        const {hits, ...result} = run;
+        const rawHpFraction = run.damage / rawHp;
+        const flags = [duration < 3 ? 'Short run' : '', rawHpFraction > 1.05 ? 'Damage exceeds Raw HP' : ''].filter(Boolean);
+        return [{...result, rawHp, rawHpFraction, deathAt: new Date(deathAt).toISOString().replace('.000',''), location: `Echo Spire ${tower.floor}F`, duration, dps: run.damage / duration, startedAt: new Date(run.first).toISOString().replace('.000',''), timeline: makeTimeline(hits, run.first, deathAt), validation:{echoSpire:true, bossDeath:true, knownRawHp:true, aboveTenPercent:true}, flags}];
+      });
+    }
+
+    function createAnalysisWorker() {
+      const source = String.raw`
+        const BOSS_NAMES = new Set(${JSON.stringify([...BOSS_NAMES])});
+        const ECHO_SPIRE_RAW_HP = new Map(${JSON.stringify([...ECHO_SPIRE_RAW_HP])});
+        const normaliseName = name => String(name || '').trim().toLocaleLowerCase();
+        const echoRawHp = (floor, mobId, name) => ECHO_SPIRE_RAW_HP.get(floor + '|' + normaliseName(mobId)) ?? ECHO_SPIRE_RAW_HP.get(floor + '|' + normaliseName(name));
+        async function readLines(file, callback) {
+          const reader = file.stream().getReader(), decoder = new TextDecoder();
+          let pending = '';
+          while (true) {
+            const {value, done} = await reader.read();
+            if (done) break;
+            const lines = (pending + decoder.decode(value, {stream:true})).split(/\r?\n/);
+            pending = lines.pop();
+            for (const line of lines) if (line) callback(line);
+          }
+          pending += decoder.decode();
+          if (pending) callback(pending);
+        }
+        function towerAt(towers, at) {
+          for (let i = towers.length - 1; i >= 0; i--) if (towers[i].at <= at) return towers[i];
+        }
+        function makeTimeline(hits, first, deathAt) {
+          const duration = Math.max(1, deathAt - first), bucketSize = 1000, buckets = new Map();
+          for (const hit of hits) { const bucket = Math.floor((hit.at - first) / bucketSize); buckets.set(bucket, (buckets.get(bucket) || 0) + hit.value); }
+          const timeline = [];
+          for (let bucket = 0; bucket <= Math.floor((duration - 1) / bucketSize); bucket++) { const bucketEnd = Math.min(duration, (bucket + 1) * bucketSize), seconds = (bucketEnd - bucket * bucketSize) / 1000; timeline.push({time:bucketEnd / 1000, dps:(buckets.get(bucket) || 0) / seconds}); }
+          return timeline;
+        }
+        async function parseCombatFile(file, character) {
+          const actorIds = new Set(), bosses = new Map(), deaths = new Map(), towerFloors = [], fights = new Map();
+          let sessionId = file.name.replace(/\.jsonl$/i, ''), wantedName = normaliseName(character), bossInstance = 0;
+          await readLines(file, line => {
+            try {
+              const record = JSON.parse(line), data = record.data || {};
+              if (record.sessionId) sessionId = record.sessionId;
+              if (record.type === 'combat.actorIdentity' && normaliseName(data.displayName) === wantedName && Number.isInteger(data.actorId)) actorIds.add(data.actorId);
+              const currentTower = towerAt(towerFloors, record.at);
+              const isEchoBoss = currentTower && echoRawHp(currentTower.floor, data.mobId, data.displayName);
+              if (record.type === 'combat.event' && data.kind === 'monsterIdentity' && data.operation === 'remove' && Number.isInteger(data.actorId)) bosses.delete(data.actorId);
+              if (record.type === 'combat.event' && data.kind === 'monsterIdentity' && data.operation === 'upsert' && (BOSS_NAMES.has(data.displayName) || isEchoBoss) && Number.isInteger(data.actorId)) bosses.set(data.actorId, {name:data.displayName, mobId:data.mobId || data.displayName, instance:++bossInstance});
+              const floor = typeof data.sourceId === 'string' ? data.sourceId.match(/^__spiritvaleTowerFloor:(\d+)$/) : null;
+              if (record.type === 'combat.event' && data.kind === 'activation' && floor && Number.isFinite(record.at)) towerFloors.push({at:record.at, floor:Number(floor[1])});
+              if (record.type !== 'combat.event' || !Number.isFinite(record.at)) return;
+              const targetBoss = bosses.get(data.targetId);
+              if (data.kind === 'death' && targetBoss) { deaths.set(data.targetId + ':' + targetBoss.instance, record.at); return; }
+              if (data.kind !== 'damage' || data.team !== 0 || !actorIds.has(data.actorId) || !bosses.has(data.targetId) || !(data.value > 0)) return;
+              const boss = bosses.get(data.targetId), deathKey = data.targetId + ':' + boss.instance, key = sessionId + ':' + data.actorId + ':' + deathKey;
+              const entry = fights.get(key) || {boss:boss.name, mobId:boss.mobId, generation:boss.instance, sessionId, targetId:data.targetId, deathKey, damage:0, first:record.at, last:record.at, hits:[]};
+              entry.damage += data.value; entry.hits.push({at:record.at, value:data.value}); entry.first = Math.min(entry.first, record.at); entry.last = Math.max(entry.last, record.at); fights.set(key, entry);
+            } catch (_) {}
+          });
+          return [...fights.values()].flatMap(run => {
+            const deathAt = deaths.get(run.deathKey);
+            if (!Number.isFinite(deathAt) || deathAt <= run.first) return [];
+            const tower = towerAt(towerFloors, deathAt), rawHp = tower && echoRawHp(tower.floor, run.mobId, run.boss);
+            if (!rawHp || run.damage <= rawHp * .1) return [];
+            const duration = (deathAt - run.first) / 1000;
+            const {hits, ...result} = run;
+            const rawHpFraction = run.damage / rawHp;
+            const flags = [duration < 3 ? 'Short run' : '', rawHpFraction > 1.05 ? 'Damage exceeds Raw HP' : ''].filter(Boolean);
+            return [{...result, rawHp, rawHpFraction, deathAt:new Date(deathAt).toISOString().replace('.000',''), location:'Echo Spire ' + tower.floor + 'F', duration, dps:run.damage / duration, startedAt:new Date(run.first).toISOString().replace('.000',''), timeline:makeTimeline(hits, run.first, deathAt), validation:{echoSpire:true, bossDeath:true, knownRawHp:true, aboveTenPercent:true}, flags}];
+          });
+        }
+        self.onmessage = async event => {
+          try { self.postMessage({runs:await parseCombatFile(event.data.file, event.data.character)}); }
+          catch (error) { self.postMessage({error:String(error?.message || error)}); }
+        };
+      `;
+      const url = URL.createObjectURL(new Blob([source], {type:'text/javascript'}));
+      return {worker: new Worker(url), url};
+    }
+
+    async function analyseWithWorkers(logs, character) {
+      if (!window.Worker || !logs.length) return false;
+      const count = Math.min(6, Math.max(2, navigator.hardwareConcurrency || 4), logs.length);
+      let nextIndex = 0, completed = 0, finished = false;
+      const workers = [];
+      return new Promise(resolve => {
+        const finish = success => {
+          if (finished) return;
+          finished = true;
+          workers.forEach(({worker, url}) => { worker.terminate(); URL.revokeObjectURL(url); });
+          resolve(success);
+        };
+        const start = worker => {
+          if (nextIndex >= logs.length) { if (completed === logs.length) finish(true); return; }
+          worker.postMessage({file: logs[nextIndex++], character});
+        };
+        try {
+          for (let index = 0; index < count; index++) {
+            const workerData = createAnalysisWorker(), worker = workerData.worker;
+            workers.push(workerData);
+            worker.onmessage = event => {
+              if (finished) return;
+              if (event.data.error) { state.runs = []; finish(false); return; }
+              state.runs.push(...event.data.runs);
+              completed++;
+              setProgress(`Analysing ${completed} / ${logs.length}…`);
+              start(worker);
+            };
+            worker.onerror = () => { state.runs = []; finish(false); };
+            start(worker);
+          }
+        } catch (_) { state.runs = []; finish(false); }
+      });
+    }
+
+    async function analyse() {
+      const character = $('characterName').value.trim();
+      if (!character) { setStatus('Select character', '', true); $('characterName').focus(); return; }
+      if (!state.files.length) { setStatus('Select data', '', true); return; }
+      showWorkspace();
+      state.runs = []; state.selected = null; state.selectedRun = null;
+      const key = cacheKey(character);
+      setProgress('Loading saved analysis…');
+      const cached = await readCache(key);
+      if (cached) {
+        state.runs = cached.runs; state.analysedCharacter = cached.analysedCharacter; setProgress('', false); render(); return;
+      }
+      setProgress('Preparing combat logs…');
+      const logs = state.files.filter(isCombatLog);
+      const usedWorkers = await analyseWithWorkers(logs, character);
+      if (!usedWorkers) {
+        for (let index = 0; index < logs.length; index++) {
+          state.runs.push(...await parseCombatFile(logs[index], character));
+          setProgress(`Analysing ${index + 1} / ${logs.length}…`);
+          await new Promise(resolve => setTimeout(resolve, 0));
+        }
+      }
+      state.analysedCharacter = character; state.selected = null; state.selectedRun = null; setProgress('', false);
+      if (state.runs.length) await writeCache(key, character, state.runs);
+      if (state.runs.length) setStatus('Complete', `${character} · ${state.runs.length} runs`);
+      else setStatus('No runs found', character, true);
+      render();
+    }
+
+    function summary() {
+      const groups = new Map();
+      for (const run of state.runs) {
+        const key = JSON.stringify([run.boss, run.location]);
+        (groups.get(key) || groups.set(key, []).get(key)).push(run);
+      }
+      const rows = [...groups.entries()].map(([key, runs]) => {
+        const [boss, location] = JSON.parse(key);
+        const best = runs.reduce((a,b) => a.dps > b.dps ? a : b), average = runs.reduce((total, run) => total + run.dps, 0) / runs.length;
+        return {key, boss, location, runs, best, average};
+      });
+      const {key: sortKey, direction} = state.sort, factor = direction === 'asc' ? 1 : -1;
+      return rows.sort((left, right) => {
+        const mapFloor = location => Number(location.match(/(\d+)F$/)?.[1]) || Number.MAX_SAFE_INTEGER;
+        const leftValue = sortKey === 'boss' ? left.boss : sortKey === 'map' ? mapFloor(left.location) : sortKey === 'best' ? left.best.dps : sortKey === 'avg' ? left.average : sortKey === 'damage' ? left.best.damage : sortKey === 'time' ? left.best.duration : left.runs.length;
+        const rightValue = sortKey === 'boss' ? right.boss : sortKey === 'map' ? mapFloor(right.location) : sortKey === 'best' ? right.best.dps : sortKey === 'avg' ? right.average : sortKey === 'damage' ? right.best.damage : sortKey === 'time' ? right.best.duration : right.runs.length;
+        const compared = typeof leftValue === 'string' ? leftValue.localeCompare(rightValue) : leftValue - rightValue;
+        return compared ? compared * factor : left.boss.localeCompare(right.boss) || left.location.localeCompare(right.location);
+      });
+    }
+
+    function render() {
+      const rows = summary(), max = Math.max(1, ...rows.map(row => row.best.dps));
+      $('loadedMeta').textContent = state.runs.length ? `${state.analysedCharacter} · ${state.runs.length} runs` : '';
+      $('metrics').innerHTML = state.runs.length ? [
+        ['ACTIVE CHARACTER', escape(state.analysedCharacter), ''], ['BOSSES RECORDED', rows.length, ''], ['BEST TARGET DPS', `${fmt(max)} DPS`, 'value'], ['TOTAL BOSS RUNS', state.runs.length, '']
+      ].map(([label,value,kind]) => `<div class="metric ${kind}"><small>${label}</small><b>${value}</b></div>`).join('') : '';
+      const sortHeader = (key, label, classes = '') => `<button class="sort-button ${classes}" data-sort="${key}">${label}${state.sort.key === key ? `<span class="sort-arrow">${state.sort.direction === 'asc' ? '▲' : '▼'}</span>` : ''}</button>`;
+      $('bossList').innerHTML = state.runs.length ? `<div class="boss-row head">${sortHeader('boss','BOSS')}${sortHeader('map','MAP')}${sortHeader('best','BEST DPS','num')}${sortHeader('avg','AVG DPS','num avg')}${sortHeader('damage','DAMAGE','num damage')}${sortHeader('time','TIME','num time')}${sortHeader('runs','RUNS','num runs')}</div>` + rows.map((row, index) => {
+        const selected = row.key === state.selected?.key;
+        return `<button type="button" class="boss-row ${selected ? 'selected' : ''}" style="--fill:${Math.max(8,row.best.dps / max * 100)}%" data-group-index="${index}"><span>${escape(row.boss)}</span><span class="map">${escape(row.location)}</span><span class="num gold">${fmt(row.best.dps)}</span><span class="num avg">${fmt(row.average)}</span><span class="num damage">${fmt(row.best.damage)}</span><span class="num time">${row.best.duration.toFixed(1)}s</span><span class="num runs">${row.runs.length}</span></button>`;
+      }).join('') : '<div class="detail empty">Choose a combat-log folder and character to begin.</div>';
+      const selectBoss = index => {
+        state.selected = rows[index] || null;
+        state.selectedRun = null;
+        render();
+      };
+      $('bossList').onclick = event => {
+        const button = event.target.closest?.('[data-group-index]');
+        if (!button) return;
+        selectBoss(Number(button.dataset.groupIndex));
+      };
+      document.querySelectorAll('[data-group-index]').forEach(button => button.addEventListener('click', event => {
+        event.stopPropagation();
+        selectBoss(Number(event.currentTarget.dataset.groupIndex));
+      }));
+      document.querySelectorAll('[data-sort]').forEach(button => button.addEventListener('click', () => {
+        const key = button.dataset.sort, numeric = !['boss','map'].includes(key);
+        state.sort = state.sort.key === key ? {key, direction: state.sort.direction === 'asc' ? 'desc' : 'asc'} : {key, direction: numeric ? 'desc' : 'asc'};
+        render();
+      }));
+      renderDetail();
+    }
+
+    function renderTimeline(run) {
+      const sourcePoints = run.timeline || [];
+      if (!sourcePoints.length) return '<div class="chart chart-empty">No DPS timeline available for this run.</div>';
+      const points = sourcePoints.length === 1 ? [{time:0, dps:sourcePoints[0].dps}, ...sourcePoints] : sourcePoints;
+      const windowSeconds = state.chartWindow;
+      const displayed = points.map((point, index) => {
+        const slice = points.slice(Math.max(0, index - windowSeconds + 1), index + 1);
+        return {...point, dps:slice.reduce((total, item) => total + item.dps, 0) / slice.length};
+      });
+      const width = 1000, height = 180, left = 10, right = 10, top = 14, bottom = 24;
+      const maxTime = Math.max(run.duration, displayed.at(-1).time, .1), maxDps = Math.max(1, ...displayed.map(point => point.dps));
+      const x = point => left + point.time / maxTime * (width - left - right);
+      const y = point => top + (1 - point.dps / maxDps) * (height - top - bottom);
+      const line = displayed.map(point => `${x(point).toFixed(1)},${y(point).toFixed(1)}`).join(' ');
+      state.timelineChart = {displayed, maxTime, maxDps, width, height, left, right, top, bottom};
+      return `<div class="chart"><div class="chart-head"><span>${windowSeconds}-SECOND DPS</span><span><select class="chart-select" id="chartWindow" aria-label="DPS smoothing"><option value="1" ${windowSeconds === 1 ? 'selected' : ''}>1 sec</option><option value="3" ${windowSeconds === 3 ? 'selected' : ''}>3 sec</option><option value="5" ${windowSeconds === 5 ? 'selected' : ''}>5 sec</option></select> ${fmt(run.dps)} AVG</span></div><svg id="dpsChart" viewBox="0 0 ${width} ${height}" role="img" aria-label="DPS over time"><line class="chart-grid" x1="${left}" y1="${top}" x2="${width-right}" y2="${top}"/><line class="chart-grid" x1="${left}" y1="${height-bottom}" x2="${width-right}" y2="${height-bottom}"/><polyline class="chart-line" points="${line}"/><g id="chartHover" visibility="hidden"><line class="chart-hover-line" id="chartHoverLine" y1="${top}" y2="${height-bottom}"/><circle class="chart-hover-point" id="chartHoverPoint" r="4"/><text class="chart-hover-label" id="chartHoverDps" text-anchor="middle"></text><text class="chart-hover-label" id="chartHoverTime" y="${height-5}" text-anchor="middle"></text></g><text class="chart-label" x="${left}" y="${height-5}">0s</text><text class="chart-label" x="${width-right}" y="${height-5}" text-anchor="end">${run.duration.toFixed(1)}s</text><text class="chart-label" x="${width-right}" y="${top-3}" text-anchor="end">${fmt(maxDps)} DPS</text></svg></div>`;
+    }
+
+    function bindTimelineHover() {
+      const chart = $('dpsChart'), data = state.timelineChart;
+      if (!chart || !data) return;
+      const hover = $('chartHover'), line = $('chartHoverLine'), point = $('chartHoverPoint'), dpsLabel = $('chartHoverDps'), timeLabel = $('chartHoverTime');
+      const update = event => {
+        const bounds = chart.getBoundingClientRect();
+        const localX = (event.clientX - bounds.left) / bounds.width * data.width;
+        const time = Math.max(0, Math.min(data.maxTime, (localX - data.left) / (data.width - data.left - data.right) * data.maxTime));
+        const nearest = data.displayed.reduce((best, item) => Math.abs(item.time - time) < Math.abs(best.time - time) ? item : best);
+        const x = data.left + nearest.time / data.maxTime * (data.width - data.left - data.right);
+        const y = data.top + (1 - nearest.dps / data.maxDps) * (data.height - data.top - data.bottom);
+        line.setAttribute('x1', x); line.setAttribute('x2', x); point.setAttribute('cx', x); point.setAttribute('cy', y);
+        dpsLabel.setAttribute('x', x); dpsLabel.setAttribute('y', Math.max(data.top + 11, y - 10)); dpsLabel.textContent = `${fmt(nearest.dps)} DPS`;
+        timeLabel.setAttribute('x', x); timeLabel.textContent = `${nearest.time.toFixed(1)}s`;
+        hover.setAttribute('visibility', 'visible');
+      };
+      chart.addEventListener('mousemove', update);
+      chart.addEventListener('mouseleave', () => hover.setAttribute('visibility', 'hidden'));
+    }
+
+    function flagsForRun(run, runs) {
+      const flags = [...(Array.isArray(run.flags) ? run.flags : [])];
+      if (runs.length >= 3) {
+        const dpsValues = runs.map(item => item.dps).sort((left, right) => left - right);
+        const middle = Math.floor(dpsValues.length / 2);
+        const median = dpsValues.length % 2 ? dpsValues[middle] : (dpsValues[middle - 1] + dpsValues[middle]) / 2;
+        if (median > 0 && run.dps > median * 2.5) flags.push('High DPS outlier');
+      }
+      return [...new Set(flags)];
+    }
+
+    function renderRunDetail(run, runs, boss, location) {
+      const card = $('runDetailCard'), detail = $('runDetail');
+      if (!run) { card.hidden = true; detail.innerHTML = ''; return; }
+      const flags = flagsForRun(run, runs);
+      card.hidden = false;
+      detail.innerHTML = `<h3>${escape(boss)}</h3><p class="sub">${escape(location)} · ${escape(run.startedAt)}</p><div class="detail-metrics"><div class="detail-metric"><small>DPS</small><b class="gold">${fmt(run.dps)}</b></div><div class="detail-metric"><small>DAMAGE</small><b>${fmt(run.damage)}</b></div><div class="detail-metric"><small>ACTIVE TIME</small><b>${run.duration.toFixed(1)}s</b></div><div class="detail-metric"><small>TARGET</small><b>${escape(run.targetId)}</b></div></div><div class="validation"><span>SPAWN <b>#${run.generation}</b></span><span>DEATH <b>${escape(run.deathAt)}</b></span><span>RAW HP DMG <b>${(run.rawHpFraction * 100).toFixed(1)}%</b></span><span>CHECKS <b>Death · Map · Raw HP</b></span><span>FLAGS <b>${flags.length ? escape(flags.join(' · ')) : 'None'}</b></span></div>${renderTimeline(run)}`;
+      bindTimelineHover();
+    }
+
+    function renderDetail() {
+      if (!state.selected) { $('detail').className = 'detail empty'; $('detail').textContent = state.runs.length ? 'Select a BOSS to show its historical runs.' : 'Your selected BOSS history will appear here.'; renderRunDetail(null); return; }
+      const {boss,location,runs,best,average} = state.selected;
+      const historyRuns = [...runs].sort((a,b) => b.first - a.first);
+      $('detail').className = 'detail';
+      $('detail').innerHTML = `<h3>${escape(boss)}</h3><p class="sub">${escape(location)} · ${runs.length} recorded run${runs.length === 1 ? '' : 's'}</p><div class="detail-metrics"><div class="detail-metric"><small>BEST DPS</small><b class="gold">${fmt(best.dps)}</b></div><div class="detail-metric"><small>AVERAGE DPS</small><b>${fmt(average)}</b></div><div class="detail-metric"><small>BEST DAMAGE</small><b>${fmt(best.damage)}</b></div><div class="detail-metric"><small>ACTIVE TIME</small><b>${best.duration.toFixed(1)}s</b></div></div><p class="history-title">HISTORY</p>${historyRuns.map((run, index) => { const flags = flagsForRun(run, runs); return `<button class="run ${state.selectedRun === run ? 'selected' : ''}" type="button" data-run-index="${index}"><time>${escape(run.startedAt)}</time><b>${fmt(run.dps)} DPS${flags.length ? `<span class="flag" title="${escape(flags.join(', '))}">⚠</span>` : ''}</b></button>`; }).join('')}`;
+      const selectRun = index => {
+        state.selectedRun = historyRuns[index] || null;
+        renderDetail();
+      };
+      $('detail').onclick = event => {
+        const button = event.target.closest?.('[data-run-index]');
+        if (!button) return;
+        selectRun(Number(button.dataset.runIndex));
+      };
+      document.querySelectorAll('[data-run-index]').forEach(button => button.addEventListener('click', event => {
+        event.stopPropagation();
+        selectRun(Number(event.currentTarget.dataset.runIndex));
+      }));
+      if (state.selectedRun) renderRunDetail(state.selectedRun, runs, boss, location);
+      $('chartWindow')?.addEventListener('change', event => { state.chartWindow = Number(event.target.value); renderDetail(); });
+    }
+
+    function reportColor(name) {
+      let value = 0;
+      for (const character of name) value = (value * 31 + character.charCodeAt(0)) >>> 0;
+      return `hsl(${value % 360} 42% 35%)`;
+    }
+    function reportInitials(name) { return name.split(/\s+/).map(word => word[0]).join('').slice(0, 3).toUpperCase(); }
+    function reportText(context, value, maxWidth) {
+      let text = value;
+      while (text.length > 1 && context.measureText(text).width > maxWidth) text = `${text.slice(0, -2)}…`;
+      return text;
+    }
+    function drawReportAvatar(context, name, x, y, size, image) {
+      context.save();
+      context.beginPath(); context.arc(x + size / 2, y + size / 2, size / 2, 0, Math.PI * 2); context.fillStyle = reportColor(name); context.fill();
+      if (image) {
+        context.clip();
+        const sourceSize = Math.min(image.naturalWidth, image.naturalHeight), sourceX = (image.naturalWidth - sourceSize) / 2, sourceY = (image.naturalHeight - sourceSize) / 2;
+        context.drawImage(image, sourceX, sourceY, sourceSize, sourceSize, x, y, size, size);
+      } else {
+        context.fillStyle = '#f0f5ed'; context.font = `700 ${Math.round(size * .28)}px Segoe UI`; context.textAlign = 'center'; context.textBaseline = 'middle'; context.fillText(reportInitials(name), x + size / 2, y + size / 2 + 1);
+      }
+      context.restore();
+    }
+    async function loadReportPortraits(rows) {
+      const portraits = new Map();
+      await Promise.all([...new Set(rows.map(row => row.boss))].map(name => new Promise(resolve => {
+        const slug = BOSS_IMAGE_SLUGS[name];
+        if (!slug) { resolve(); return; }
+        const image = new Image(); image.crossOrigin = 'anonymous'; image.decoding = 'async';
+        image.onload = () => { portraits.set(name, image); resolve(); };
+        image.onerror = resolve;
+        image.src = `${BOSS_IMAGE_BASE}${slug}.webp`;
+      })));
+      return portraits;
+    }
+    async function downloadImageReport() {
+      if (!state.runs.length) return;
+      setProgress('Generating image report…');
+      const rows = summary().sort((left, right) => Number(left.location.match(/(\d+)F$/)?.[1]) - Number(right.location.match(/(\d+)F$/)?.[1]) || left.boss.localeCompare(right.boss));
+      const portraits = await loadReportPortraits(rows);
+      const perColumn = 9, firstColumnBosses = 7, columns = Math.max(1, 1 + Math.ceil(Math.max(0, rows.length - firstColumnBosses) / perColumn)), width = Math.max(640, columns * 310 + 40), top = 10, rowHeight = 92, height = top + perColumn * rowHeight + 10;
+      const columnWidth = (width - 40 - 12) / columns;
+      const canvas = document.createElement('canvas'); canvas.width = width; canvas.height = height;
+      const context = canvas.getContext('2d');
+      context.fillStyle = '#101410'; context.fillRect(0, 0, width, height);
+      const title = 'Echo Spire Boss DPS';
+      context.fillStyle = '#e0e4db'; context.font = '700 28px Segoe UI'; context.fillText(title, 30, top + 36);
+      context.fillStyle = '#8fd6a2'; context.font = '700 24px Segoe UI'; context.fillText(state.analysedCharacter, 30, top + 73);
+      const bestRuns = rows.map(row => row.best);
+      const totalDamage = bestRuns.reduce((total, run) => total + run.damage, 0);
+      const totalDuration = bestRuns.reduce((total, run) => total + run.duration, 0);
+      const averageDps = totalDamage / Math.max(.001, totalDuration);
+      context.fillStyle = '#c1c9bd'; context.font = '700 13px Segoe UI'; context.fillText('BEST DPS AVG', 30, top + rowHeight + 31);
+      context.fillStyle = '#dbc66e'; context.font = '700 36px Segoe UI'; context.fillText(fmt(averageDps), 30, top + rowHeight + 74);
+      rows.forEach((row, index) => {
+        const firstColumn = index < firstColumnBosses, adjustedIndex = firstColumn ? index : index - firstColumnBosses;
+        const column = firstColumn ? 0 : 1 + Math.floor(adjustedIndex / perColumn), rowIndex = firstColumn ? index + 2 : adjustedIndex % perColumn, x = 20 + column * (columnWidth + 12), y = top + rowIndex * rowHeight;
+        context.fillStyle = rowIndex % 2 ? '#181d17' : '#1c211b'; context.fillRect(x, y, columnWidth, rowHeight - 5);
+        drawReportAvatar(context, row.boss, x + 12, y + 18, 50, portraits.get(row.boss));
+        context.fillStyle = '#e0e4db'; context.font = '700 14px Segoe UI'; context.fillText(reportText(context, row.boss, columnWidth - 78), x + 74, y + 32);
+        context.fillStyle = '#8fd6a2'; context.font = '12px Segoe UI'; context.fillText(`${row.best.duration.toFixed(1)}s`, x + 74, y + 67);
+        context.fillStyle = '#c1c9bd'; context.font = '10px Segoe UI'; context.textAlign = 'right'; context.fillText('BEST DPS', x + columnWidth - 14, y + 32);
+        context.fillStyle = '#dbc66e'; context.font = '700 34px Segoe UI'; context.fillText(fmt(row.best.dps), x + columnWidth - 14, y + 70); context.textAlign = 'left';
+      });
+      const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+      if (blob) {
+        const url = URL.createObjectURL(blob), link = Object.assign(document.createElement('a'), {href:url, download:'echo-spire-boss-dps-report.png'});
+        link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+      }
+      setProgress('', false);
+    }
+
+    async function loadFiles(files) {
+      state.files = files;
+      const first = state.files[0], logCount = state.files.filter(isCombatLog).length;
+      $('folderName').textContent = first ? `${logCount} combat logs found` : 'No files found in this folder';
+      $('characterStep').hidden = true; $('steps').classList.add('one-step');
+      $('analyseButton').disabled = true; $('analyseButton').hidden = true;
+      showCharacterOptions([]);
+      if (!first) return;
+      setStatus('Reading characters', ''); setProgress('Reading characters…');
+      const {names, activeName} = await findCharacters();
+      setProgress('', false); $('characterStep').hidden = false; $('steps').classList.remove('one-step'); $('analyseButton').hidden = false; showCharacterOptions(names, activeName);
+      if (names.length) setStatus('Select character', `${names.length} found`);
+      else setStatus('No character found', 'Select data first', true);
+    }
+
+    $('folderInput').addEventListener('change', event => loadFiles([...event.target.files]));
+    $('characterName').addEventListener('change', () => { $('analyseButton').disabled = !$('characterName').value; });
+    $('analyseButton').addEventListener('click', analyse);
+    $('imageReportButton').addEventListener('click', downloadImageReport);
+  </script>
+</body>
+</html>
