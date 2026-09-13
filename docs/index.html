@@ -61,8 +61,13 @@
     .primary { border-color:transparent; background:var(--primary); color:#0b3820; }
     .primary:hover { background:#a5e3b4; }
     #folderInput { display:none; }
-    .progress { display:none; margin:11px 1px 0; color:var(--value); font-size:12px; }
-    .progress.show { display:block; }
+    .progress-shell { display:none; margin:11px 1px 0; }
+    .progress-shell.show { display:block; }
+    .progress { margin:0 0 6px; color:var(--value); font-size:12px; }
+    .progress-track { height:5px; overflow:hidden; border-radius:99px; background:var(--container-high); }
+    .progress-bar { display:block; height:100%; width:0; border-radius:inherit; background:var(--primary); transition:width .18s ease; }
+    .progress-bar.indeterminate { width:28%; animation:progress-slide 1.15s ease-in-out infinite alternate; }
+    @keyframes progress-slide { from { transform:translateX(-100%); } to { transform:translateX(360%); } }
     .metrics { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin:12px 0; }
     .metric { padding:12px 14px; border-radius:var(--radius); background:var(--container); }
     .metric small { display:block; color:var(--muted); font-size:10px; font-weight:600; }
@@ -80,7 +85,8 @@
     .boss-row { display:grid; width:100%; grid-template-columns:minmax(105px,1fr) 90px 80px 80px 88px 64px 52px; align-items:center; gap:8px; min-height:42px; padding:0 14px; border:0; border-bottom:1px solid var(--outline); border-radius:0; color:var(--text); text-align:left; font-size:12px; font-variant-numeric:tabular-nums; }
     .boss-row:last-child { border-bottom:0; }
     .boss-row:not(.head) { cursor:pointer; background:linear-gradient(90deg,var(--primary-container) 0 var(--fill),transparent var(--fill)); }
-    .boss-row:not(.head):hover,.boss-row.selected { background-color:var(--secondary); }
+    .boss-row:not(.head):hover { background-color:var(--secondary); }
+    .boss-row.selected { background-color:#294d35; box-shadow:inset 4px 0 var(--primary),inset 0 0 0 1px rgba(143,214,162,.5); }
     .boss-row.head { min-height:31px; color:var(--muted); background:var(--container); font-size:10px; font-weight:600; }
     .sort-button { width:100%; padding:0; border:0; background:transparent; color:inherit; text-align:left; font:inherit; font-weight:inherit; white-space:nowrap; }
     .sort-button.num { text-align:right; }
@@ -111,12 +117,17 @@
     .chart-hover-line { stroke:var(--value); stroke-width:1; stroke-dasharray:3 3; }
     .chart-hover-point { fill:var(--value); stroke:var(--surface); stroke-width:2; }
     .chart-hover-label { fill:var(--value); font-size:10px; font-weight:700; paint-order:stroke; stroke:var(--container); stroke-width:3px; stroke-linejoin:round; }
+    .chart-reference-best { stroke:#dbc66e; stroke-width:1; stroke-dasharray:5 3; opacity:.8; }
+    .chart-reference-avg { stroke:#8bb9dc; stroke-width:1; stroke-dasharray:3 3; opacity:.75; }
+    .chart-reference-label { font-size:9px; font-weight:700; paint-order:stroke; stroke:var(--container); stroke-width:3px; stroke-linejoin:round; }
     .chart-empty { color:var(--muted); font-size:11px; text-align:center; }
     .chart-select { height:24px; border:1px solid var(--outline); border-radius:5px; background:var(--surface); color:var(--text); font-size:10px; }
     .validation { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:5px 10px; margin-top:12px; padding:9px; border:1px solid var(--outline); border-radius:8px; background:var(--container); color:var(--muted); font-size:10px; }
     .validation b { color:var(--text); font-weight:600; }
     .flag { margin-left:4px; color:var(--value); font-size:10px; }
     .error { color:var(--error); }
+    .boss-search { width:128px; height:28px; padding:4px 9px; border:1px solid var(--outline); border-radius:14px; background:var(--surface); color:var(--text); font-size:11px; outline:none; }
+    .boss-search:focus { border-color:var(--primary); }
     @media (max-width:800px) { .steps,.data-layout { grid-template-columns:1fr; } .control-card { grid-template-columns:1fr; } .metrics { grid-template-columns:repeat(2,1fr); } }
     @media (max-width:500px) { .main { padding:12px; } .setup { padding:16px; } .titlebar { padding:0 12px; } .version { display:none; } .boss-row { grid-template-columns:minmax(90px,1fr) 86px 76px; } .boss-row .avg,.boss-row .damage,.boss-row .time,.boss-row .runs { display:none; } }
   </style>
@@ -136,11 +147,11 @@
 
       <section class="workspace" id="workspace">
         <div class="panel-title"><div><h1>Echo Spire Boss DPS</h1><p>Select a boss to view its runs</p></div><p id="loadedMeta"></p></div>
-        <p class="progress" id="progress"></p>
+        <div class="progress-shell" id="progressShell"><p class="progress" id="progress"></p><div class="progress-track"><span class="progress-bar" id="progressBar"></span></div></div>
         <div class="metrics" id="metrics"></div>
         <div class="data-layout">
-          <article class="data-card"><div class="card-head"><h2>BOSS performance</h2><div class="card-actions"><span>Click a BOSS for its history</span><button class="button" id="imageReportButton">Image report</button></div></div><div class="boss-list" id="bossList"></div></article>
-          <article class="data-card"><div class="card-head"><h2>Run history</h2></div><div class="detail empty" id="detail">Select a BOSS to show its historical runs.</div></article>
+          <article class="data-card"><div class="card-head"><h2>BOSS performance</h2><div class="card-actions"><input class="boss-search" id="bossSearch" type="search" placeholder="Search boss" aria-label="Search boss"><button class="button" id="imageReportButton">Image report</button></div></div><div class="boss-list" id="bossList"></div></article>
+          <article class="data-card"><div class="card-head"><h2 id="historyHeading">Run history</h2></div><div class="detail empty" id="detail">Select a BOSS to show its historical runs.</div></article>
         </div>
         <article class="data-card run-detail-card" id="runDetailCard" hidden><div class="card-head"><h2>Run details</h2></div><div class="run-detail-content" id="runDetail"></div></article>
       </section>
@@ -169,7 +180,7 @@
       'Echo Berserker Master':'nightmareberserkerboss', 'Echo Gunslinger Master':'nightmaregunslingerboss', 'Echo Necromancer Master':'nightmarenecromancerboss', 'Echo Paladin Master':'nightmarepaladinboss',
       'Echo Priest Master':'nightmarepriestboss', 'Echo Shinobi Master':'nightmareshinobiboss', 'Echo Weaver Master':'nightmareweaverboss', 'Echo Wizard Master':'nightmarewizardboss'
     };
-    const state = { files: [], runs: [], selected: null, selectedRun: null, analysedCharacter: '', chartWindow: 1, timelineChart: null, sort: {key: 'best', direction: 'desc'} };
+    const state = { files: [], runs: [], selected: null, selectedRun: null, analysedCharacter: '', bossSearch: '', chartWindow: 1, timelineChart: null, sort: {key: 'best', direction: 'desc'} };
     const $ = id => document.getElementById(id);
     const fmt = value => new Intl.NumberFormat().format(Math.round(value));
     const escape = value => String(value).replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
@@ -177,7 +188,13 @@
 
     function showWorkspace() { $('workspace').classList.add('visible'); $('workspace').scrollIntoView({behavior:'smooth', block:'start'}); }
     function setStatus(title, status, error = false) { /* Status is intentionally kept out of the minimal start screen. */ }
-    function setProgress(message, visible = true) { $('progress').textContent = message; $('progress').classList.toggle('show', visible); }
+    function setProgress(message, visible = true) {
+      const match = String(message).match(/(\d+)\s*\/\s*(\d+)/), percent = match ? Math.round(Number(match[1]) / Math.max(1, Number(match[2])) * 100) : null;
+      $('progress').textContent = percent === null ? message : `${message} · ${percent}%`;
+      $('progressShell').classList.toggle('show', visible);
+      $('progressBar').style.width = percent === null ? '' : `${percent}%`;
+      $('progressBar').classList.toggle('indeterminate', visible && percent === null);
+    }
     function normaliseName(name) { return name.trim().toLocaleLowerCase(); }
     function relativePath(file) { return file.webkitRelativePath || file.relativePath || ''; }
     function isCombatLog(file) { return /\.jsonl$/i.test(file.name) && /(^|\/)logs\/combat\//i.test(relativePath(file).replaceAll('\\','/')); }
@@ -452,7 +469,7 @@
       setProgress('Loading saved analysis…');
       const cached = await readCache(key);
       if (cached) {
-        state.runs = cached.runs; state.analysedCharacter = cached.analysedCharacter; setProgress('', false); render(); return;
+        state.runs = cached.runs; state.analysedCharacter = cached.analysedCharacter; state.selected = summary()[0] || null; setProgress('', false); $('folderName').textContent = `${state.analysedCharacter} · ${state.runs.length} valid runs`; render(); return;
       }
       setProgress('Preparing combat logs…');
       const logs = state.files.filter(isCombatLog);
@@ -464,7 +481,7 @@
           await new Promise(resolve => setTimeout(resolve, 0));
         }
       }
-      state.analysedCharacter = character; state.selected = null; state.selectedRun = null; setProgress('', false);
+      state.analysedCharacter = character; state.selected = state.runs.length ? summary()[0] : null; state.selectedRun = null; setProgress('', false); $('folderName').textContent = `${character} · ${state.runs.length} valid runs`;
       if (state.runs.length) await writeCache(key, character, state.runs);
       if (state.runs.length) setStatus('Complete', `${character} · ${state.runs.length} runs`);
       else setStatus('No runs found', character, true);
@@ -493,16 +510,17 @@
     }
 
     function render() {
-      const rows = summary(), max = Math.max(1, ...rows.map(row => row.best.dps));
+      const allRows = summary(), query = state.bossSearch.trim().toLocaleLowerCase(), rows = query ? allRows.filter(row => `${row.boss} ${row.location}`.toLocaleLowerCase().includes(query)) : allRows, max = Math.max(1, ...allRows.map(row => row.best.dps));
       $('loadedMeta').textContent = state.runs.length ? `${state.analysedCharacter} · ${state.runs.length} runs` : '';
       $('metrics').innerHTML = state.runs.length ? [
-        ['ACTIVE CHARACTER', escape(state.analysedCharacter), ''], ['BOSSES RECORDED', rows.length, ''], ['BEST TARGET DPS', `${fmt(max)} DPS`, 'value'], ['TOTAL BOSS RUNS', state.runs.length, '']
+        ['ACTIVE CHARACTER', escape(state.analysedCharacter), ''], ['BOSSES RECORDED', allRows.length, ''], ['BEST TARGET DPS', `${fmt(max)} DPS`, 'value'], ['TOTAL BOSS RUNS', state.runs.length, '']
       ].map(([label,value,kind]) => `<div class="metric ${kind}"><small>${label}</small><b>${value}</b></div>`).join('') : '';
       const sortHeader = (key, label, classes = '') => `<button class="sort-button ${classes}" data-sort="${key}">${label}${state.sort.key === key ? `<span class="sort-arrow">${state.sort.direction === 'asc' ? '▲' : '▼'}</span>` : ''}</button>`;
       $('bossList').innerHTML = state.runs.length ? `<div class="boss-row head">${sortHeader('boss','BOSS')}${sortHeader('map','MAP')}${sortHeader('best','BEST DPS','num')}${sortHeader('avg','AVG DPS','num avg')}${sortHeader('damage','DAMAGE','num damage')}${sortHeader('time','TIME','num time')}${sortHeader('runs','RUNS','num runs')}</div>` + rows.map((row, index) => {
         const selected = row.key === state.selected?.key;
         return `<button type="button" class="boss-row ${selected ? 'selected' : ''}" style="--fill:${Math.max(8,row.best.dps / max * 100)}%" data-group-index="${index}"><span>${escape(row.boss)}</span><span class="map">${escape(row.location)}</span><span class="num gold">${fmt(row.best.dps)}</span><span class="num avg">${fmt(row.average)}</span><span class="num damage">${fmt(row.best.damage)}</span><span class="num time">${row.best.duration.toFixed(1)}s</span><span class="num runs">${row.runs.length}</span></button>`;
       }).join('') : '<div class="detail empty">Choose a combat-log folder and character to begin.</div>';
+      if (state.runs.length && !rows.length) $('bossList').innerHTML = '<div class="detail empty">No matching BOSS.</div>';
       const selectBoss = index => {
         state.selected = rows[index] || null;
         state.selectedRun = null;
@@ -525,7 +543,7 @@
       renderDetail();
     }
 
-    function renderTimeline(run) {
+    function renderTimeline(run, runs = []) {
       const sourcePoints = run.timeline || [];
       if (!sourcePoints.length) return '<div class="chart chart-empty">No DPS timeline available for this run.</div>';
       const points = sourcePoints.length === 1 ? [{time:0, dps:sourcePoints[0].dps}, ...sourcePoints] : sourcePoints;
@@ -535,12 +553,14 @@
         return {...point, dps:slice.reduce((total, item) => total + item.dps, 0) / slice.length};
       });
       const width = 1000, height = 180, left = 10, right = 10, top = 14, bottom = 24;
-      const maxTime = Math.max(run.duration, displayed.at(-1).time, .1), maxDps = Math.max(1, ...displayed.map(point => point.dps));
+      const bestReference = runs.length ? Math.max(...runs.map(item => item.dps)) : null, averageReference = runs.length ? runs.reduce((total, item) => total + item.dps, 0) / runs.length : null;
+      const maxTime = Math.max(run.duration, displayed.at(-1).time, .1), maxDps = Math.max(1, ...displayed.map(point => point.dps), bestReference || 0, averageReference || 0);
       const x = point => left + point.time / maxTime * (width - left - right);
       const y = point => top + (1 - point.dps / maxDps) * (height - top - bottom);
       const line = displayed.map(point => `${x(point).toFixed(1)},${y(point).toFixed(1)}`).join(' ');
+      const reference = (value, className, color, label) => value === null ? '' : `<line class="${className}" x1="${left}" y1="${y({dps:value})}" x2="${width-right}" y2="${y({dps:value})}"/><text class="chart-reference-label" fill="${color}" x="${width-right}" y="${Math.min(height-bottom-3, y({dps:value}) + 11)}" text-anchor="end">${label} ${fmt(value)}</text>`;
       state.timelineChart = {displayed, maxTime, maxDps, width, height, left, right, top, bottom};
-      return `<div class="chart"><div class="chart-head"><span>${windowSeconds}-SECOND DPS</span><span><select class="chart-select" id="chartWindow" aria-label="DPS smoothing"><option value="1" ${windowSeconds === 1 ? 'selected' : ''}>1 sec</option><option value="3" ${windowSeconds === 3 ? 'selected' : ''}>3 sec</option><option value="5" ${windowSeconds === 5 ? 'selected' : ''}>5 sec</option></select> ${fmt(run.dps)} AVG</span></div><svg id="dpsChart" viewBox="0 0 ${width} ${height}" role="img" aria-label="DPS over time"><line class="chart-grid" x1="${left}" y1="${top}" x2="${width-right}" y2="${top}"/><line class="chart-grid" x1="${left}" y1="${height-bottom}" x2="${width-right}" y2="${height-bottom}"/><polyline class="chart-line" points="${line}"/><g id="chartHover" visibility="hidden"><line class="chart-hover-line" id="chartHoverLine" y1="${top}" y2="${height-bottom}"/><circle class="chart-hover-point" id="chartHoverPoint" r="4"/><text class="chart-hover-label" id="chartHoverDps" text-anchor="middle"></text><text class="chart-hover-label" id="chartHoverTime" y="${height-5}" text-anchor="middle"></text></g><text class="chart-label" x="${left}" y="${height-5}">0s</text><text class="chart-label" x="${width-right}" y="${height-5}" text-anchor="end">${run.duration.toFixed(1)}s</text><text class="chart-label" x="${width-right}" y="${top-3}" text-anchor="end">${fmt(maxDps)} DPS</text></svg></div>`;
+      return `<div class="chart"><div class="chart-head"><span>${windowSeconds}-SECOND DPS</span><span><select class="chart-select" id="chartWindow" aria-label="DPS smoothing"><option value="1" ${windowSeconds === 1 ? 'selected' : ''}>1 sec</option><option value="3" ${windowSeconds === 3 ? 'selected' : ''}>3 sec</option><option value="5" ${windowSeconds === 5 ? 'selected' : ''}>5 sec</option></select> ${fmt(run.dps)} AVG</span></div><svg id="dpsChart" viewBox="0 0 ${width} ${height}" role="img" aria-label="DPS over time"><line class="chart-grid" x1="${left}" y1="${top}" x2="${width-right}" y2="${top}"/><line class="chart-grid" x1="${left}" y1="${height-bottom}" x2="${width-right}" y2="${height-bottom}"/>${reference(bestReference, 'chart-reference-best', '#dbc66e', 'BEST')}${reference(averageReference, 'chart-reference-avg', '#8bb9dc', 'AVG')}<polyline class="chart-line" points="${line}"/><g id="chartHover" visibility="hidden"><line class="chart-hover-line" id="chartHoverLine" y1="${top}" y2="${height-bottom}"/><circle class="chart-hover-point" id="chartHoverPoint" r="4"/><text class="chart-hover-label" id="chartHoverDps" text-anchor="middle"></text><text class="chart-hover-label" id="chartHoverTime" y="${height-5}" text-anchor="middle"></text></g><text class="chart-label" x="${left}" y="${height-5}">0s</text><text class="chart-label" x="${width-right}" y="${height-5}" text-anchor="end">${run.duration.toFixed(1)}s</text></svg></div>`;
     }
 
     function bindTimelineHover() {
@@ -579,13 +599,14 @@
       if (!run) { card.hidden = true; detail.innerHTML = ''; return; }
       const flags = flagsForRun(run, runs);
       card.hidden = false;
-      detail.innerHTML = `<h3>${escape(boss)}</h3><p class="sub">${escape(location)} · ${escape(run.startedAt)}</p><div class="detail-metrics"><div class="detail-metric"><small>DPS</small><b class="gold">${fmt(run.dps)}</b></div><div class="detail-metric"><small>DAMAGE</small><b>${fmt(run.damage)}</b></div><div class="detail-metric"><small>ACTIVE TIME</small><b>${run.duration.toFixed(1)}s</b></div><div class="detail-metric"><small>TARGET</small><b>${escape(run.targetId)}</b></div></div><div class="validation"><span>SPAWN <b>#${run.generation}</b></span><span>DEATH <b>${escape(run.deathAt)}</b></span><span>RAW HP DMG <b>${(run.rawHpFraction * 100).toFixed(1)}%</b></span><span>CHECKS <b>Death · Map · Raw HP</b></span><span>FLAGS <b>${flags.length ? escape(flags.join(' · ')) : 'None'}</b></span></div>${renderTimeline(run)}`;
+      detail.innerHTML = `<h3>${escape(boss)}</h3><p class="sub">${escape(location)} · ${escape(run.startedAt)}</p><div class="detail-metrics"><div class="detail-metric"><small>DPS</small><b class="gold">${fmt(run.dps)}</b></div><div class="detail-metric"><small>DAMAGE</small><b>${fmt(run.damage)}</b></div><div class="detail-metric"><small>ACTIVE TIME</small><b>${run.duration.toFixed(1)}s</b></div><div class="detail-metric"><small>TARGET</small><b>${escape(run.targetId)}</b></div></div><div class="validation"><span>SPAWN <b>#${run.generation}</b></span><span>DEATH <b>${escape(run.deathAt)}</b></span><span>RAW HP DMG <b>${(run.rawHpFraction * 100).toFixed(1)}%</b></span><span>CHECKS <b>Death · Map · Raw HP</b></span><span>FLAGS <b>${flags.length ? escape(flags.join(' · ')) : 'None'}</b></span></div>${renderTimeline(run, runs)}`;
       bindTimelineHover();
     }
 
     function renderDetail() {
-      if (!state.selected) { $('detail').className = 'detail empty'; $('detail').textContent = state.runs.length ? 'Select a BOSS to show its historical runs.' : 'Your selected BOSS history will appear here.'; renderRunDetail(null); return; }
+      if (!state.selected) { $('historyHeading').textContent = 'Run history'; $('detail').className = 'detail empty'; $('detail').textContent = state.runs.length ? 'Select a BOSS to show its historical runs.' : 'Your selected BOSS history will appear here.'; renderRunDetail(null); return; }
       const {boss,location,runs,best,average} = state.selected;
+      $('historyHeading').textContent = `Run history · ${boss}`;
       const historyRuns = [...runs].sort((a,b) => b.first - a.first);
       $('detail').className = 'detail';
       $('detail').innerHTML = `<h3>${escape(boss)}</h3><p class="sub">${escape(location)} · ${runs.length} recorded run${runs.length === 1 ? '' : 's'}</p><div class="detail-metrics"><div class="detail-metric"><small>BEST DPS</small><b class="gold">${fmt(best.dps)}</b></div><div class="detail-metric"><small>AVERAGE DPS</small><b>${fmt(average)}</b></div><div class="detail-metric"><small>BEST DAMAGE</small><b>${fmt(best.damage)}</b></div><div class="detail-metric"><small>ACTIVE TIME</small><b>${best.duration.toFixed(1)}s</b></div></div><p class="history-title">HISTORY</p>${historyRuns.map((run, index) => { const flags = flagsForRun(run, runs); return `<button class="run ${state.selectedRun === run ? 'selected' : ''}" type="button" data-run-index="${index}"><time>${escape(run.startedAt)}</time><b>${fmt(run.dps)} DPS${flags.length ? `<span class="flag" title="${escape(flags.join(', '))}">⚠</span>` : ''}</b></button>`; }).join('')}`;
@@ -689,6 +710,7 @@
       setStatus('Reading characters', ''); setProgress('Reading characters…');
       const {names, activeName} = await findCharacters();
       setProgress('', false); $('characterStep').hidden = false; $('steps').classList.remove('one-step'); $('analyseButton').hidden = false; showCharacterOptions(names, activeName);
+      $('folderName').textContent = names.length ? `${names.slice(0, 2).join(', ')}${names.length > 2 ? ` +${names.length - 2}` : ''} · ${logCount} combat logs` : `${logCount} combat logs · no characters found`;
       if (names.length) setStatus('Select character', `${names.length} found`);
       else setStatus('No character found', 'Select data first', true);
     }
@@ -697,6 +719,7 @@
     $('characterName').addEventListener('change', () => { $('analyseButton').disabled = !$('characterName').value; });
     $('analyseButton').addEventListener('click', analyse);
     $('imageReportButton').addEventListener('click', downloadImageReport);
+    $('bossSearch').addEventListener('input', event => { state.bossSearch = event.target.value; render(); });
   </script>
 </body>
 </html>
