@@ -28,12 +28,16 @@
     .version,.tag { color:var(--primary); font-size:13px; font-weight:500; }
     .window-actions { margin-left:auto; display:flex; gap:16px; color:var(--muted); font-size:15px; }
     .main { padding:18px 20px 28px; max-width:1120px; margin:auto; }
-    .page-title { margin:0 0 12px; font-size:20px; }
+    .page-brand { display:flex; align-items:center; gap:10px; margin:0 0 12px; }
+    .page-title { margin:0; font-size:20px; }
+    .page-logo { width:42px; height:42px; object-fit:cover; border:1px solid var(--outline); border-radius:11px; background:var(--container); }
     .capture { display:flex; gap:12px; align-items:center; min-height:62px; padding:12px 14px; border:1px solid var(--outline); border-radius:13px; background:#151a15; }
     .dot { width:8px; height:8px; border-radius:50%; background:var(--primary); flex:none; }
     .capture strong { display:block; font-size:13px; }
     .capture span { display:block; margin-top:3px; color:var(--value); font-size:12px; }
-    .setup { margin-top:16px; padding:22px; border:1px solid var(--outline); border-radius:13px; background:var(--container); }
+    .setup { position:relative; overflow:hidden; margin-top:16px; padding:22px; border:1px solid var(--outline); border-radius:13px; background:var(--container); }
+    .setup::before { content:""; position:absolute; inset:0; opacity:.065; background:url('https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcR0zv-pflE7C-ycPGhVlPjtG75XFML25Sc41Msy2jpvpQ&s=10') center/cover no-repeat; filter:blur(1px) saturate(1.2); pointer-events:none; }
+    .setup > * { position:relative; }
     .setup h1 { margin:0 0 16px; font-size:20px; }
     .steps { display:grid; grid-template-columns:1fr; gap:12px; }
     .steps.one-step { grid-template-columns:1fr; }
@@ -63,7 +67,9 @@
     #folderInput { display:none; }
     .progress-shell { display:none; margin:11px 1px 0; }
     .progress-shell.show { display:block; }
+    .progress-meta { display:flex; align-items:center; gap:7px; }
     .progress { margin:0 0 6px; color:var(--value); font-size:12px; }
+    .progress-icon { width:21px; height:21px; margin-bottom:6px; border-radius:6px; object-fit:cover; opacity:.9; }
     .progress-track { height:5px; overflow:hidden; border-radius:99px; background:var(--container-high); }
     .progress-bar { display:block; height:100%; width:0; border-radius:inherit; background:var(--primary); transition:width .18s ease; }
     .progress-bar.indeterminate { width:28%; animation:progress-slide 1.15s ease-in-out infinite alternate; }
@@ -92,6 +98,13 @@
     .sort-button.num { text-align:right; }
     .sort-arrow { margin-left:2px; color:var(--primary); }
     .map { color:var(--primary); font-size:10px; }
+    .boss-name { display:flex; align-items:center; gap:7px; min-width:0; font-weight:600; }
+    .boss-name > span:last-child { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .boss-avatar,.selected-boss-avatar,.detail-boss-avatar { position:relative; display:inline-grid; place-items:center; flex:0 0 auto; overflow:hidden; border-radius:50%; background:var(--avatar,#3a4b3f); color:#f0f5ed; font-size:9px; font-weight:700; }
+    .boss-avatar { width:27px; height:27px; }
+    .selected-boss-avatar { width:34px; height:34px; }
+    .detail-boss-avatar { width:46px; height:46px; font-size:12px; }
+    .boss-avatar img,.selected-boss-avatar img,.detail-boss-avatar img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
     .num { text-align:right; }
     .gold { color:var(--value); }
     .detail { padding:14px; }
@@ -120,6 +133,10 @@
     .chart-reference-best { stroke:#dbc66e; stroke-width:1; stroke-dasharray:5 3; opacity:.8; }
     .chart-reference-avg { stroke:#8bb9dc; stroke-width:1; stroke-dasharray:3 3; opacity:.75; }
     .chart-reference-label { font-size:9px; font-weight:700; paint-order:stroke; stroke:var(--container); stroke-width:3px; stroke-linejoin:round; }
+    .history-head,.detail-boss-heading { display:flex; align-items:center; gap:9px; min-width:0; }
+    .history-head h2 { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .detail-boss-heading h3 { margin:0; }
+    .detail-boss-heading .sub { margin:2px 0 0; }
     .chart-empty { color:var(--muted); font-size:11px; text-align:center; }
     .chart-select { height:24px; border:1px solid var(--outline); border-radius:5px; background:var(--surface); color:var(--text); font-size:10px; }
     .validation { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:5px 10px; margin-top:12px; padding:9px; border:1px solid var(--outline); border-radius:8px; background:var(--container); color:var(--muted); font-size:10px; }
@@ -135,7 +152,7 @@
 <body>
   <div class="app">
     <main class="main">
-      <h1 class="page-title">Echo Spire Boss DPS</h1>
+      <div class="page-brand"><img class="page-logo" src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcR0zv-pflE7C-ycPGhVlPjtG75XFML25Sc41Msy2jpvpQ&amp;s=10" alt="Echo Spire"><h1 class="page-title">Echo Spire Boss DPS</h1></div>
       <section class="setup" aria-label="Start analysis">
         <div class="steps one-step" id="steps">
           <div class="step"><span class="step-number">1</span><strong>Select data &nbsp; Example: …/spirit-vale-overlay-windows-x64-v0.10.8/data</strong><label class="file-button" for="folderInput">Choose folder</label><span class="folder-picked" id="folderName"></span></div>
@@ -147,11 +164,11 @@
 
       <section class="workspace" id="workspace">
         <div class="panel-title"><div><h1>Echo Spire Boss DPS</h1><p>Select a boss to view its runs</p></div><p id="loadedMeta"></p></div>
-        <div class="progress-shell" id="progressShell"><p class="progress" id="progress"></p><div class="progress-track"><span class="progress-bar" id="progressBar"></span></div></div>
+        <div class="progress-shell" id="progressShell"><div class="progress-meta"><img class="progress-icon" src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcR0zv-pflE7C-ycPGhVlPjtG75XFML25Sc41Msy2jpvpQ&amp;s=10" alt=""><p class="progress" id="progress"></p></div><div class="progress-track"><span class="progress-bar" id="progressBar"></span></div></div>
         <div class="metrics" id="metrics"></div>
         <div class="data-layout">
           <article class="data-card"><div class="card-head"><h2>BOSS performance</h2><div class="card-actions"><input class="boss-search" id="bossSearch" type="search" placeholder="Search boss" aria-label="Search boss"><button class="button" id="imageReportButton">Image report</button></div></div><div class="boss-list" id="bossList"></div></article>
-          <article class="data-card"><div class="card-head"><h2 id="historyHeading">Run history</h2></div><div class="detail empty" id="detail">Select a BOSS to show its historical runs.</div></article>
+          <article class="data-card"><div class="card-head"><div class="history-head"><span class="selected-boss-avatar" id="historyAvatar" style="--avatar:#3a4b3f"><span id="historyAvatarText">?</span><img id="historyAvatarImage" alt="" hidden></span><h2 id="historyHeading">Run history</h2></div></div><div class="detail empty" id="detail">Select a BOSS to show its historical runs.</div></article>
         </div>
         <article class="data-card run-detail-card" id="runDetailCard" hidden><div class="card-head"><h2>Run details</h2></div><div class="run-detail-content" id="runDetail"></div></article>
       </section>
@@ -518,7 +535,7 @@
       const sortHeader = (key, label, classes = '') => `<button class="sort-button ${classes}" data-sort="${key}">${label}${state.sort.key === key ? `<span class="sort-arrow">${state.sort.direction === 'asc' ? '▲' : '▼'}</span>` : ''}</button>`;
       $('bossList').innerHTML = state.runs.length ? `<div class="boss-row head">${sortHeader('boss','BOSS')}${sortHeader('map','MAP')}${sortHeader('best','BEST DPS','num')}${sortHeader('avg','AVG DPS','num avg')}${sortHeader('damage','DAMAGE','num damage')}${sortHeader('time','TIME','num time')}${sortHeader('runs','RUNS','num runs')}</div>` + rows.map((row, index) => {
         const selected = row.key === state.selected?.key;
-        return `<button type="button" class="boss-row ${selected ? 'selected' : ''}" style="--fill:${Math.max(8,row.best.dps / max * 100)}%" data-group-index="${index}"><span>${escape(row.boss)}</span><span class="map">${escape(row.location)}</span><span class="num gold">${fmt(row.best.dps)}</span><span class="num avg">${fmt(row.average)}</span><span class="num damage">${fmt(row.best.damage)}</span><span class="num time">${row.best.duration.toFixed(1)}s</span><span class="num runs">${row.runs.length}</span></button>`;
+        return `<button type="button" class="boss-row ${selected ? 'selected' : ''}" style="--fill:${Math.max(8,row.best.dps / max * 100)}%" data-group-index="${index}"><span class="boss-name">${bossAvatarMarkup(row.boss)}<span>${escape(row.boss)}</span></span><span class="map">${escape(row.location)}</span><span class="num gold">${fmt(row.best.dps)}</span><span class="num avg">${fmt(row.average)}</span><span class="num damage">${fmt(row.best.damage)}</span><span class="num time">${row.best.duration.toFixed(1)}s</span><span class="num runs">${row.runs.length}</span></button>`;
       }).join('') : '<div class="detail empty">Choose a combat-log folder and character to begin.</div>';
       if (state.runs.length && !rows.length) $('bossList').innerHTML = '<div class="detail empty">No matching BOSS.</div>';
       const selectBoss = index => {
@@ -599,13 +616,14 @@
       if (!run) { card.hidden = true; detail.innerHTML = ''; return; }
       const flags = flagsForRun(run, runs);
       card.hidden = false;
-      detail.innerHTML = `<h3>${escape(boss)}</h3><p class="sub">${escape(location)} · ${escape(run.startedAt)}</p><div class="detail-metrics"><div class="detail-metric"><small>DPS</small><b class="gold">${fmt(run.dps)}</b></div><div class="detail-metric"><small>DAMAGE</small><b>${fmt(run.damage)}</b></div><div class="detail-metric"><small>ACTIVE TIME</small><b>${run.duration.toFixed(1)}s</b></div><div class="detail-metric"><small>TARGET</small><b>${escape(run.targetId)}</b></div></div><div class="validation"><span>SPAWN <b>#${run.generation}</b></span><span>DEATH <b>${escape(run.deathAt)}</b></span><span>RAW HP DMG <b>${(run.rawHpFraction * 100).toFixed(1)}%</b></span><span>CHECKS <b>Death · Map · Raw HP</b></span><span>FLAGS <b>${flags.length ? escape(flags.join(' · ')) : 'None'}</b></span></div>${renderTimeline(run, runs)}`;
+      detail.innerHTML = `<div class="detail-boss-heading">${bossAvatarMarkup(boss, 'detail-boss-avatar')}<div><h3>${escape(boss)}</h3><p class="sub">${escape(location)} · ${escape(run.startedAt)}</p></div></div><div class="detail-metrics"><div class="detail-metric"><small>DPS</small><b class="gold">${fmt(run.dps)}</b></div><div class="detail-metric"><small>DAMAGE</small><b>${fmt(run.damage)}</b></div><div class="detail-metric"><small>ACTIVE TIME</small><b>${run.duration.toFixed(1)}s</b></div><div class="detail-metric"><small>TARGET</small><b>${escape(run.targetId)}</b></div></div><div class="validation"><span>SPAWN <b>#${run.generation}</b></span><span>DEATH <b>${escape(run.deathAt)}</b></span><span>RAW HP DMG <b>${(run.rawHpFraction * 100).toFixed(1)}%</b></span><span>CHECKS <b>Death · Map · Raw HP</b></span><span>FLAGS <b>${flags.length ? escape(flags.join(' · ')) : 'None'}</b></span></div>${renderTimeline(run, runs)}`;
       bindTimelineHover();
     }
 
     function renderDetail() {
-      if (!state.selected) { $('historyHeading').textContent = 'Run history'; $('detail').className = 'detail empty'; $('detail').textContent = state.runs.length ? 'Select a BOSS to show its historical runs.' : 'Your selected BOSS history will appear here.'; renderRunDetail(null); return; }
+      if (!state.selected) { updateHistoryAvatar(); $('historyHeading').textContent = 'Run history'; $('detail').className = 'detail empty'; $('detail').textContent = state.runs.length ? 'Select a BOSS to show its historical runs.' : 'Your selected BOSS history will appear here.'; renderRunDetail(null); return; }
       const {boss,location,runs,best,average} = state.selected;
+      updateHistoryAvatar(boss);
       $('historyHeading').textContent = `Run history · ${boss}`;
       const historyRuns = [...runs].sort((a,b) => b.first - a.first);
       $('detail').className = 'detail';
@@ -633,6 +651,18 @@
       return `hsl(${value % 360} 42% 35%)`;
     }
     function reportInitials(name) { return name.split(/\s+/).map(word => word[0]).join('').slice(0, 3).toUpperCase(); }
+    function bossAvatarMarkup(name, className = 'boss-avatar') {
+      const slug = BOSS_IMAGE_SLUGS[name], image = slug ? `<img src="${BOSS_IMAGE_BASE}${slug}.webp" alt="" loading="lazy" onerror="this.remove()">` : '';
+      return `<span class="${className}" style="--avatar:${reportColor(name)}"><span>${escape(reportInitials(name))}</span>${image}</span>`;
+    }
+    function updateHistoryAvatar(name = '') {
+      const avatar = $('historyAvatar'), text = $('historyAvatarText'), image = $('historyAvatarImage'), slug = BOSS_IMAGE_SLUGS[name];
+      text.textContent = name ? reportInitials(name) : '?';
+      avatar.style.setProperty('--avatar', name ? reportColor(name) : '#3a4b3f');
+      image.hidden = !slug;
+      if (slug) image.src = `${BOSS_IMAGE_BASE}${slug}.webp`;
+      image.onerror = () => { image.hidden = true; };
+    }
     function reportText(context, value, maxWidth) {
       let text = value;
       while (text.length > 1 && context.measureText(text).width > maxWidth) text = `${text.slice(0, -2)}…`;
