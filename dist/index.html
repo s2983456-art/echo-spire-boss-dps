@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Echo Spire Boss DPS</title>
+  <title>Echo Spire Boss DPS v1.0.1</title>
   <style>
     :root {
       color-scheme: dark;
@@ -156,7 +156,7 @@
 <body>
   <div class="app">
     <main class="main">
-      <div class="page-brand"><img class="page-logo" src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcR0zv-pflE7C-ycPGhVlPjtG75XFML25Sc41Msy2jpvpQ&amp;s=10" alt="Echo Spire"><h1 class="page-title">Echo Spire Boss DPS</h1></div>
+      <div class="page-brand"><img class="page-logo" src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcR0zv-pflE7C-ycPGhVlPjtG75XFML25Sc41Msy2jpvpQ&amp;s=10" alt="Echo Spire"><h1 class="page-title">Echo Spire Boss DPS v1.0.1</h1></div>
       <section class="setup" aria-label="Start analysis">
         <div class="steps one-step" id="steps">
           <div class="step"><span class="step-number">1</span><strong>Select data &nbsp; Example: …/spirit-vale-overlay-windows-x64-v0.10.8/data</strong><label class="file-button" for="folderInput">Choose folder</label><span class="folder-picked" id="folderName"></span></div>
@@ -167,7 +167,7 @@
       </section>
 
       <section class="workspace" id="workspace">
-        <div class="panel-title"><div><h1>Echo Spire Boss DPS</h1><p>Select a boss to view its runs</p></div><p id="loadedMeta"></p></div>
+        <div class="panel-title"><div><h1>Echo Spire Boss DPS v1.0.1</h1><p>Select a boss to view its runs</p></div><p id="loadedMeta"></p></div>
         <div class="progress-shell" id="progressShell"><div class="progress-meta"><img class="progress-icon" src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcR0zv-pflE7C-ycPGhVlPjtG75XFML25Sc41Msy2jpvpQ&amp;s=10" alt=""><p class="progress" id="progress"></p></div><div class="progress-track"><span class="progress-bar" id="progressBar"></span></div></div>
         <div class="metrics" id="metrics"></div>
         <div class="data-layout">
@@ -801,7 +801,7 @@
       const canvas = document.createElement('canvas'); canvas.width = width; canvas.height = height;
       const context = canvas.getContext('2d');
       context.fillStyle = '#101410'; context.fillRect(0, 0, width, height);
-      const title = 'Echo Spire Boss DPS';
+      const title = 'Echo Spire Boss DPS v1.0.1';
       context.fillStyle = '#e0e4db'; context.font = '700 28px Segoe UI'; context.fillText(title, 30, top + 36);
       const characterText = profileLabel(profile) ? `${state.analysedCharacter} · ${profileLabel(profile)}` : state.analysedCharacter;
       drawReportAvatar(context, profile?.className || state.analysedCharacter, 30, top + 47, 28, classPortrait);
